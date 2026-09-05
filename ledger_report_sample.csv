@@ -1,0 +1,5 @@
+repo,codebase,fps,episodes_sampled,frames_sampled,ts_nonmonotonic_eps,frac_bad_dt,dt_jitter_ratio,frame_gap_eps,stuck_state_frac,identity_frac,lag_frames,r_lag0,r_best,dup_episode_frac,flags,note
+lerobot/svla_so101_pickplace,v3.0,30.0,50,11939,0,0.0,0.0,0,0.20186727226848347,0.0,4.0,0.9603700968534187,0.9977176745925831,0.0,stuck_state|large_lag,
+lerobot/aloha_sim_insertion_human,v3.0,50.0,15,7500,0,0.0,0.0,0,0.0,0.0,1.0,0.9372768960107881,0.9375490202560937,0.0,,
+lerobot/aloha_static_cups_open,v3.0,50.0,50,20000,0,0.0,0.0,0,0.0010025062656641604,0.0,2.0,0.9847943933019765,0.9868232024879631,0.0,,
+IPEC-COMMUNITY/kuka_lerobot,v2.0,10.0,1,9,0,0.0,7.450580596923828e-08,0,0.0,nan,nan,nan,nan,0.0,,

@@ -1,0 +1,7 @@
+numpy>=1.26
+scipy>=1.11
+pandas>=2.0
+pyarrow>=15
+huggingface_hub>=0.25
+pytest>=8
+# hardware (M-03): pip install ur_rtde lerobot
