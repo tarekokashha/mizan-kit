@@ -35,6 +35,46 @@ def test_every_defect_generates(defect):
     assert len(df) > 0
 
 
+def test_duplicate_defect_reuses_episode_zero_action():
+    df = make_episodes(defect="duplicate", seed=0, n_eps=3, T=50)
+    by_episode = {ep: np.stack(sub["action"].to_numpy())
+                  for ep, sub in df.groupby("episode_index")}
+    for ep in range(1, 3):
+        assert np.array_equal(by_episode[ep], by_episode[0])
+
+
+def test_swapped_defect_exchanges_action_and_state():
+    clean = make_episodes(defect="", seed=0, n_eps=2, T=50)
+    swapped = make_episodes(defect="swapped", seed=0, n_eps=2, T=50)
+    clean_action = np.stack(clean["action"].to_numpy())
+    clean_state = np.stack(clean["observation.state"].to_numpy())
+    swapped_action = np.stack(swapped["action"].to_numpy())
+    swapped_state = np.stack(swapped["observation.state"].to_numpy())
+    assert np.array_equal(swapped_action, clean_state)
+    assert np.array_equal(swapped_state, clean_action)
+
+
+def test_identity_defect_makes_action_equal_state():
+    df = make_episodes(defect="identity", seed=0, n_eps=2, T=50)
+    action = np.stack(df["action"].to_numpy())
+    state = np.stack(df["observation.state"].to_numpy())
+    assert np.array_equal(action, state)
+
+
+def test_stuck_defect_has_run_of_identical_state():
+    df = make_episodes(defect="stuck", seed=0, n_eps=1, T=100)
+    state = np.stack(df["observation.state"].to_numpy())
+    run = state[50:100]
+    assert np.array_equal(run, np.broadcast_to(state[50], run.shape))
+
+
+def test_drops_defect_removes_frames_from_even_episodes():
+    T = 80
+    df = make_episodes(defect="drops", seed=0, n_eps=2, T=T)
+    assert int((df["episode_index"] == 0).sum()) < T
+    assert int((df["episode_index"] == 1).sum()) == T
+
+
 def test_n_joints_is_honoured():
     df = make_episodes(n_joints=14, T=50, n_eps=2, seed=3)
     assert len(df["observation.state"].iloc[0]) == 14
