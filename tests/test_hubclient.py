@@ -65,3 +65,35 @@ def test_pagination_follows_link_header(monkeypatch):
     c = HubClient(min_interval=0.0)
     monkeypatch.setattr(c, "_open", lambda req, timeout=None: next(seq))
     assert [d["id"] for d in c.iter_datasets()] == ["a", "b"]
+
+
+def test_authorization_header_reaches_request(monkeypatch):
+    captured = {}
+
+    def opener(req, timeout=None):
+        captured["req"] = req
+        return FakeResp({"ok": True})
+
+    c = HubClient(min_interval=0.0, token="hf_testvalue")
+    monkeypatch.setattr(c, "_open", opener)
+    c.get_json("https://example/x")
+    assert captured["req"].get_header("Authorization") == "Bearer hf_testvalue"
+
+
+def test_no_token_sends_no_authorization_header(monkeypatch):
+    # Clear both env vars the client checks, and also stub the
+    # huggingface_hub fallback so this does not depend on whether this
+    # machine happens to have a cached CLI login or an OIDC token.
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.delenv("HUGGING_FACE_HUB_TOKEN", raising=False)
+    monkeypatch.setattr("huggingface_hub.get_token", lambda: None)
+    captured = {}
+
+    def opener(req, timeout=None):
+        captured["req"] = req
+        return FakeResp({"ok": True})
+
+    c = HubClient(min_interval=0.0, token=None)
+    monkeypatch.setattr(c, "_open", opener)
+    c.get_json("https://example/x")
+    assert captured["req"].get_header("Authorization") is None
