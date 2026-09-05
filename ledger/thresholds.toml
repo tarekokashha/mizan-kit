@@ -1,0 +1,11 @@
+# Thresholds for the M-02 LEDGER audit.
+# Values below are the v0 defaults. They are deliberately loose. Task 4
+# calibrates them against clean synthetic data and records the measured
+# false positive rate in docs. Do not tighten a threshold to make a
+# result look better.
+[thresholds]
+frac_bad_dt = 0.05
+stuck_state_frac = 0.20
+identity_frac = 0.50
+lag_large = 3
+dup_episode_frac = 0.0
