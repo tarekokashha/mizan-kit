@@ -17,3 +17,4 @@ census_out/
 
 # HF cache if ever pointed here
 .hf_cache/
+.superpowers/
