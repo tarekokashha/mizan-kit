@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+
+# Environments
+.venv/
+venv/
+
+# Census artifacts (large, regenerable)
+ledger_report.csv
+census_out/
+*.jsonl
+!ledger_report_sample.csv
+
+# HF cache if ever pointed here
+.hf_cache/
