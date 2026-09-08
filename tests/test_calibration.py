@@ -62,6 +62,32 @@ LAG_RECOVERY_MIN_JOINTS = 6
 LAG_SCORE_TOLERANCE = 0.02
 
 
+def _independent_score_at_lag(action, state, lag):
+    """Correlation at a fixed lag, computed independently of xcorr_lag.
+
+    Mean centre both arrays, divide by their per-joint standard
+    deviations, then take the mean over joints of the elementwise
+    product at the given shift. This is a separate implementation, not
+    a call into ledger.checks.xcorr_lag, so a bug in that function
+    cannot also corrupt the value this test compares it against. The
+    shift convention matches xcorr_lag's: for a non negative lag,
+    action is truncated from the end and state is truncated from the
+    start by the same amount, so action[i] is compared against
+    state[i + lag].
+    """
+    T = len(action)
+    a = action - action.mean(axis=0)
+    s = state - state.mean(axis=0)
+    sa = a.std(axis=0) + 1e-9
+    ss = s.std(axis=0) + 1e-9
+    if lag >= 0:
+        aa, shifted = a[:T - lag], s[lag:]
+    else:
+        aa, shifted = a[-lag:], s[:T + lag]
+    per_joint = (aa * shifted).mean(axis=0) / (sa * ss)
+    return float(np.nanmean(per_joint))
+
+
 @given(
     lag=st.integers(min_value=0, max_value=6),
     n_joints=st.integers(min_value=LAG_RECOVERY_MIN_JOINTS, max_value=14),
@@ -74,9 +100,18 @@ def test_injected_lag_is_recovered(lag, n_joints, seed):
     a = np.stack(df["action"].to_numpy())
     s = np.stack(df["observation.state"].to_numpy())
     best, _, r_best = xcorr_lag(a, s)
+    # A wrong label must not be able to hide behind a near tie: this
+    # holds regardless of the score gap checked below, so a stub that
+    # ignores its inputs or reports the wrong sign fails here directly.
+    assert abs(best - lag) <= 1, (
+        f"lag={lag} n_joints={n_joints} seed={seed} recovered as {best}, "
+        f"more than one frame off the injected lag")
     if best == lag:
         return
-    _, _, r_true = xcorr_lag(a, s, lags=(lag,))
+    # r_true is computed by the independent helper above, not by
+    # calling xcorr_lag again, so this check cannot pass merely because
+    # xcorr_lag agrees with itself.
+    r_true = _independent_score_at_lag(a, s, lag)
     gap = r_best - r_true
     assert gap <= LAG_SCORE_TOLERANCE, (
         f"lag={lag} n_joints={n_joints} seed={seed} recovered as {best} "

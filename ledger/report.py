@@ -41,6 +41,13 @@ Flags describe measurements, not findings. PROVISIONAL_HEADER says so
 and is written as the first line of every CSV. This module never labels
 a dataset as having a confirmed problem; DatasetReport.confirmed is
 where a human records that after opening the data.
+
+Two of those flags, large_lag and negative_lag, come from lag_frames,
+which docs/calibration.md shows xcorr_lag does not reliably resolve
+below 6 action dimensions (96.75 percent exact match at n_joints=2,
+versus 0 to 2 mismatches per 6000 to 8000 trials, all near ties, at
+n_joints 6 and above). Below 6 action dimensions, treat those two flags
+as uninformative and confirm by hand rather than trusting the flag.
 """
 from __future__ import annotations
 

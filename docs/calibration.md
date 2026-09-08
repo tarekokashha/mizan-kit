@@ -231,6 +231,32 @@ data, the rule stays the same: fix the check or widen the threshold, and
 update this document with the real numbers from that run. Never narrow a
 defect threshold to force a pass.
 
+## Limitations for census users
+
+`large_lag` and `negative_lag`, two of the eight published flags, are
+derived entirely from `lag_frames`, which comes straight from
+`xcorr_lag`. Part 3 above measured that `xcorr_lag` does not reliably
+resolve the best lag below 6 action dimensions (`n_joints < 6`): in the
+400-trial-per-bucket sweep, `n_joints=2` exact-matched only 387 of 400
+trials (96.75 percent), with mismatches up to 6 frames off the injected
+lag, and a dedicated 8000-trial sweep at `n_joints=2` alone found the
+worst-case score gap growing to 0.0343. At `n_joints=6` and above the
+same sweeps found 0 mismatches in 400 trials per joint count, and only 2
+in a dedicated 6000-trial sweep (0.033 percent), every one a near tie
+rather than a real miss. `LAG_RECOVERY_MIN_JOINTS = 6` in
+`tests/test_calibration.py` reflects exactly this measured boundary.
+
+Many real LeRobot datasets record fewer than 6 action dimensions: a
+single gripper task, a 2 or 3 DoF planar arm, and similar recordings are
+common on the Hub. For any dataset with fewer than 6 action dimensions,
+treat `large_lag` and `negative_lag` as uninformative rather than as a
+finding. The estimator was never validated in that regime, so a flag
+there should be confirmed by hand, by opening the data and inspecting
+the action and state traces directly, before it is used for anything.
+The other six flags (`ts_nonmonotonic`, `bad_dt`, `frame_gaps`,
+`stuck_state`, `action_equals_state`, `duplicate_episodes`) do not
+depend on `xcorr_lag` and are unaffected by this limitation.
+
 ## Environment
 
 python 3.11.15, numpy 2.4.6, pandas 3.0.5, pyarrow 25.0.1,

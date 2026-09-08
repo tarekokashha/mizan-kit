@@ -9,6 +9,8 @@ way tests/test_audit.py calls the v0 functions.
 """
 import math
 
+import numpy as np
+
 from ledger.audit import audit_frame as v0_audit_frame
 from ledger.audit import summarise as v0_summarise
 from ledger.report import (
@@ -126,3 +128,64 @@ def test_report_reproduces_v0_exactly_for_every_defect():
         assert new.note == v0.note, f"defect={defect!r} note"
         for field in numeric_fields:
             _assert_field_equal(getattr(v0, field), getattr(new, field), f"defect={defect!r} field={field}")
+
+
+def test_multi_part_pooling_matches_v0_with_unequal_parts():
+    """Multi part pooling must match v0 exactly when parts differ in
+    episode count and frame count, not just when a single dict is
+    wrapped in a length-1 list.
+
+    Every other summarise() call in this file passes exactly one part,
+    so nothing else here would catch a regression in how report.py
+    pools MORE THAN ONE part. Four parts are built with different
+    n_eps (2, 2, 1, 3), different T (150, 200, 100, 130), and the
+    second part uses defect="drops" so its two episodes end up unequal
+    length within that part (one dropped, one not), on top of the
+    frame count already differing part to part.
+
+    Three parts inject lag=1 and one injects lag=6. v0 pools
+    lag_frames as the median over every per-episode lag concatenated
+    across all four parts: with these seeds that is
+    [1, 1, 1, 1, 1, 6, 6, 6], median 1.0. A naive implementation that
+    instead averaged each part's own median (1.0, 1.0, 1.0, 6.0) would
+    report 2.25. The assertion below computes that wrong, naive answer
+    from the same parts and checks it actually diverges from v0's
+    pooled lag_frames, so this test cannot pass without teeth: if a
+    future seed or shape change ever made the two coincide, this would
+    fail loudly rather than silently stop testing anything.
+    """
+    specs = [
+        dict(n_eps=2, T=150, n_joints=8, lag=1, defect="", seed=101),
+        dict(n_eps=2, T=200, n_joints=8, lag=1, defect="drops", seed=102),
+        dict(n_eps=1, T=100, n_joints=8, lag=1, defect="", seed=103),
+        dict(n_eps=3, T=130, n_joints=8, lag=6, defect="", seed=104),
+    ]
+    dfs = [make_episodes(fps=30.0, **spec) for spec in specs]
+    assert [int(df["episode_index"].nunique()) for df in dfs] == [2, 2, 1, 3], \
+        "part shapes must carry different episode counts"
+
+    v0_parts = [v0_audit_frame(df, 30.0) for df in dfs]
+    new_parts = [audit_frame(df, 30.0) for df in dfs]
+    assert len({p["frames"] for p in v0_parts}) == len(v0_parts), \
+        "part shapes must carry different frame counts"
+
+    v0 = v0_summarise("t", {"fps": 30}, v0_parts)
+    new = summarise("t", {"fps": 30}, new_parts)
+
+    # Self check: a naive mean of each part's own median must actually
+    # diverge from v0's correct pooled median, or these part shapes do
+    # not exercise the bug this test targets.
+    per_part_medians = [np.median(p["lags"]) for p in v0_parts if p["lags"]]
+    naive_lag_frames = float(np.mean(per_part_medians))
+    assert abs(naive_lag_frames - v0.lag_frames) > 0.5, (
+        "chosen part shapes do not create a pooling divergence: "
+        f"naive={naive_lag_frames} pooled(v0)={v0.lag_frames}")
+
+    assert new.flags == v0.flags, f"flags differ: v0={v0.flags!r} new={new.flags!r}"
+    numeric_fields = (
+        "fps", "episodes_sampled", "frames_sampled", "ts_nonmonotonic_eps",
+        "frac_bad_dt", "dt_jitter_ratio", "frame_gap_eps", "stuck_state_frac",
+        "identity_frac", "lag_frames", "r_lag0", "r_best", "dup_episode_frac",
+    )
+    for field in numeric_fields:
+        _assert_field_equal(getattr(v0, field), getattr(new, field), f"field={field}")
