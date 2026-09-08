@@ -17,13 +17,20 @@ spirit as protocols/PROTOCOL_TEMPLATE.md, rather than a post hoc one.
 Every reported rate carries a Wilson confidence interval from
 cairo_protocol.stats; prevalence() never returns a bare rate.
 
-Both tiers write to a JSONL ledger keyed by repo@revision. Every record
-is flushed to disk immediately after it is computed, not batched to the
-end, so a crash costs at most the one dataset being processed when it
-happened. load_done() reads that ledger back into the set of keys
-already written, tolerating a truncated final line, exactly what a
-crash mid write leaves behind, by skipping it rather than raising. A
-caller passes that set back in as `done` on the next run to resume.
+Both tiers write to a JSONL ledger keyed by repo@revision. The revision
+half of that key comes from source.revision(repo) when the source has
+one (StreamingSource and DownloadSource proxy HubClient.get_revision,
+which captures the Hub's X-Repo-Commit header); a source with no such
+method, LocalSource and SyntheticSource among them, leaves it empty,
+same as before. Every record is flushed to disk immediately after it
+is computed, not batched to the end, so a crash costs at most the one
+dataset being processed when it happened. load_done() reads that
+ledger back into the set of keys already written, tolerating a
+truncated final line, exactly what a crash mid write leaves behind, by
+skipping it rather than raising. A caller passes that set back in as
+`done` on the next run to resume, and a repo whose revision changed on
+the Hub since the ledger was written no longer matches its old key, so
+it is re audited rather than silently skipped.
 
 Graceful degradation is mandatory in the deep tier: a missing repo, an
 absent info.json, an unreadable parquet file, or any other raised
@@ -123,14 +130,28 @@ def run_metadata_tier(repos: list[str], source, out_path, done: set[str] | None 
     per dataset flush discipline as run_deep_tier: a metadata pass can
     be interrupted and resumed exactly like a deep pass, and any error
     fetching info is recorded rather than raised.
+
+    Ruling 9: a source that can report a revision (StreamingSource and
+    DownloadSource, via HubClient.get_revision) has it read both before
+    and after the info() call. The pre-call read only ever finds
+    something on a source whose revision was already warmed earlier in
+    this process, for instance a deep tier pass sharing the same client
+    right after this one; a cold call always reads "" there, since the
+    revision is only known once info() itself has returned. Either way,
+    the value read after info() is what gets recorded on the report, so
+    the key a subsequent load_done() sees is repo@<sha>, not repo@, for
+    every source that can supply one. A source with no revision method,
+    LocalSource and SyntheticSource among them, behaves exactly as
+    before: the key stays repo@.
     """
     done = done if done is not None else set()
+    get_revision = getattr(source, "revision", None)
     n = 0
     for repo in repos:
-        rep = DatasetReport(repo=repo, source=type(source).__name__)
-        key = _key(rep.repo, rep.revision)
-        if key in done:
+        pre_revision = get_revision(repo) if get_revision else ""
+        if _key(repo, pre_revision) in done:
             continue
+        rep = DatasetReport(repo=repo, source=type(source).__name__)
         try:
             info = source.info(repo)
             if info is None:
@@ -140,6 +161,8 @@ def run_metadata_tier(repos: list[str], source, out_path, done: set[str] | None 
                 rep.fps = float(info.get("fps", float("nan")))
         except Exception as e:  # noqa: BLE001 - graceful degradation is the point
             rep.error = f"{type(e).__name__}: {e}"
+        if get_revision:
+            rep.revision = get_revision(repo)
         append_jsonl(rep, out_path)
         n += 1
     return n
@@ -156,11 +179,20 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
     same way as run_metadata_tier: a repo already present in `done` is
     skipped, and every record is flushed to out_path immediately after
     it is computed, never batched to the end.
+
+    Ruling 9: the resume key is read from source.revision(repo), when
+    the source has one, both before and after info() is fetched, for
+    the same reason and with the same fallback to "" documented on
+    run_metadata_tier. The revision recorded on a successful report is
+    always the post-info() read, which is the one a subsequent
+    load_done() will see.
     """
     done = done if done is not None else set()
+    get_revision = getattr(source, "revision", None)
     n = 0
     for repo in repos:
-        key = _key(repo)
+        pre_revision = get_revision(repo) if get_revision else ""
+        key = _key(repo, pre_revision)
         if key in done:
             continue
         try:
@@ -177,6 +209,8 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
         except Exception as e:  # noqa: BLE001 - graceful degradation is the point
             rep = DatasetReport(repo=repo, source=type(source).__name__,
                                 error=f"{type(e).__name__}: {e}")
+        if get_revision:
+            rep.revision = get_revision(repo)
         append_jsonl(rep, out_path)
         n += 1
     return n

@@ -82,6 +82,15 @@ class StreamingSource:
     def info(self, repo: str) -> dict | None:
         return self.client.get_info(repo)
 
+    def revision(self, repo: str) -> str:
+        """The Hub revision sha captured by the most recent info(repo).
+
+        Proxies HubClient.get_revision, so it is "" until info(repo) has
+        been called at least once, and stays "" if the response carried
+        no X-Repo-Commit header. Never raises.
+        """
+        return self.client.get_revision(repo)
+
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
         return derive_paths(info, limit)
 
@@ -99,6 +108,10 @@ class DownloadSource:
 
     def info(self, repo: str) -> dict | None:
         return self.client.get_info(repo)
+
+    def revision(self, repo: str) -> str:
+        """See StreamingSource.revision: proxies HubClient.get_revision."""
+        return self.client.get_revision(repo)
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
         return derive_paths(info, limit)

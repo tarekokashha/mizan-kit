@@ -97,3 +97,47 @@ def test_no_token_sends_no_authorization_header(monkeypatch):
     monkeypatch.setattr(c, "_open", opener)
     c.get_json("https://example/x")
     assert captured["req"].get_header("Authorization") is None
+
+
+# --------------------------------------------------------------------------- #
+# Ruling 9: get_info captures the Hub revision from X-Repo-Commit, so the
+# census resume key can become repo@<sha> instead of degenerating to repo@.
+# --------------------------------------------------------------------------- #
+def test_get_info_captures_the_x_repo_commit_header(monkeypatch):
+    sha = "f641879e22172be7e8161d5e6c1503c2d2feb657"
+
+    def opener(req, timeout=None):
+        return FakeResp({"fps": 30}, headers={"X-Repo-Commit": sha})
+
+    c = HubClient(min_interval=0.0)
+    monkeypatch.setattr(c, "_open", opener)
+    info = c.get_info("lerobot/svla_so101_pickplace")
+    assert info == {"fps": 30}
+    assert c.get_revision("lerobot/svla_so101_pickplace") == sha
+
+
+def test_get_revision_stays_empty_when_the_header_is_absent(monkeypatch):
+    def opener(req, timeout=None):
+        return FakeResp({"fps": 30}, headers={})
+
+    c = HubClient(min_interval=0.0)
+    monkeypatch.setattr(c, "_open", opener)
+    c.get_info("acme/no-header")  # must not raise
+    assert c.get_revision("acme/no-header") == ""
+
+
+def test_get_revision_is_empty_for_a_repo_never_queried():
+    c = HubClient(min_interval=0.0)
+    assert c.get_revision("never/queried") == ""
+
+
+def test_get_revision_does_not_change_get_info_return_contract(monkeypatch):
+    # Capturing the header must be invisible to get_info's own contract:
+    # a successful call still returns the parsed info dict, unchanged.
+    def opener(req, timeout=None):
+        return FakeResp({"codebase_version": "v3.0", "fps": 30},
+                        headers={"X-Repo-Commit": "abc123"})
+
+    c = HubClient(min_interval=0.0)
+    monkeypatch.setattr(c, "_open", opener)
+    assert c.get_info("acme/x") == {"codebase_version": "v3.0", "fps": 30}

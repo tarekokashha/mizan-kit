@@ -33,6 +33,25 @@ def _discover_token() -> str | None:
         return None
 
 
+def _extract_revision(response) -> str:
+    """Read the X-Repo-Commit header off a Hub response, or "".
+
+    The resolve endpoint carries the exact commit sha of the revision it
+    served in this header, at no extra request cost. A response with no
+    headers attribute, or one whose headers do not carry this key (an
+    older endpoint, or a fake response a test builds without it), yields
+    "" rather than raising: the revision is best effort metadata, never
+    a requirement for the caller to keep working.
+    """
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return ""
+    try:
+        return headers.get("X-Repo-Commit", "") or ""
+    except AttributeError:
+        return ""
+
+
 class HubClient:
     def __init__(self, min_interval: float = 0.2, max_retries: int = 5,
                  timeout: float = 45.0, token: str | None = None,
@@ -49,6 +68,9 @@ class HubClient:
         # in it. It is merged in only at request build time, in _raw.
         self._token = tok
         self._last = 0.0
+        # repo -> revision sha, captured as a side effect of get_info().
+        # See _extract_revision and get_revision below (Ruling 9).
+        self._revisions: dict[str, str] = {}
 
     def __repr__(self) -> str:
         return f"HubClient(authenticated={self._has_token}, min_interval={self.min_interval})"
@@ -98,13 +120,25 @@ class HubClient:
 
     def get_info(self, repo: str) -> dict | None:
         try:
-            return self.get_json(RESOLVE.format(repo=repo))
+            with self._raw(RESOLVE.format(repo=repo)) as r:
+                self._revisions[repo] = _extract_revision(r)
+                return json.loads(r.read())
         except urllib.error.HTTPError as e:
             if e.code in (401, 403, 404):
                 return None
             raise
         except (RateLimited, json.JSONDecodeError):
             return None
+
+    def get_revision(self, repo: str) -> str:
+        """The Hub revision sha last captured for repo, or "".
+
+        Populated as a side effect of get_info(repo): see
+        _extract_revision. Returns "" for a repo get_info has not been
+        called for yet, or whose response carried no X-Repo-Commit
+        header. Never raises.
+        """
+        return self._revisions.get(repo, "")
 
     def iter_datasets(self, filter_tag: str = "LeRobot", page_size: int = 1000,
                       max_pages: int | None = None) -> Iterator[dict]:

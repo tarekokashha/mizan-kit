@@ -156,6 +156,96 @@ def test_metadata_tier_resume_skips_completed(tmp_path):
     assert [r["repo"] for r in rows] == ["acme/b"]
 
 
+class _RevisionedLocalSource:
+    """LocalSource plus a fixed revision() answer, standing in for a Hub
+    backed source whose revision() proxies HubClient.get_revision after
+    a captured X-Repo-Commit header (Ruling 9). Kept offline: no source
+    here ever touches the network, only a LocalSource fixture wrapped
+    with a canned revision.
+    """
+
+    def __init__(self, root, sha):
+        self._local = LocalSource(root)
+        self._sha = sha
+
+    def info(self, repo):
+        return self._local.info(repo)
+
+    def parquet_paths(self, repo, info, limit=None):
+        return self._local.parquet_paths(repo, info, limit)
+
+    def frames(self, repo, path):
+        return self._local.frames(repo, path)
+
+    def revision(self, repo):
+        return self._sha
+
+
+_SHA = "f641879e22172be7e8161d5e6c1503c2d2feb657"
+
+
+def test_deep_tier_records_the_real_revision_on_the_report(tmp_path):
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
+    n = run_deep_tier(["acme/a"], _RevisionedLocalSource(root, _SHA), cfg, out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert rows[0]["revision"] == _SHA
+
+
+def test_deep_tier_resume_key_is_repo_at_sha_not_bare(tmp_path):
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
+    run_deep_tier(["acme/a"], _RevisionedLocalSource(root, _SHA), cfg, out)
+    done = load_done(out)
+    assert done == {f"acme/a@{_SHA}"}
+    assert "acme/a@" not in done
+
+
+def test_deep_tier_still_resumes_correctly_when_the_revision_is_known_upfront(tmp_path):
+    # If the caller already knows the revision before this call (e.g. a
+    # metadata tier pass warmed the same HubClient earlier), the
+    # pre-fetch skip check must use it, not silently fall back to a
+    # bare repo@ that could never match a done set keyed by sha.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
+    done = {f"acme/a@{_SHA}"}
+    n = run_deep_tier(["acme/a"], _RevisionedLocalSource(root, _SHA), cfg, out, done=done)
+    assert n == 0
+    assert not out.exists()  # nothing was skipped-but-recorded; append_jsonl never ran
+
+
+def test_metadata_tier_records_the_real_revision_on_the_report(tmp_path):
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "meta.jsonl"
+    n = run_metadata_tier(["acme/a"], _RevisionedLocalSource(root, _SHA), out)
+    assert n == 1
+    done = load_done(out)
+    assert done == {f"acme/a@{_SHA}"}
+
+
+def test_local_source_without_a_revision_method_still_keys_repo_at_bare(tmp_path):
+    # LocalSource itself exposes no revision() (Ruling 9 scopes the new
+    # capability to the Hub backed sources only). Nothing here should
+    # raise, and the resume key stays repo@ exactly as before, so every
+    # existing LocalSource based resume test keeps its meaning.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
+    run_deep_tier(["acme/a"], LocalSource(root), cfg, out)
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert rows[0]["revision"] == ""
+    assert load_done(out) == {"acme/a@"}
+
+
 class _FakeClient:
     def __init__(self, ids):
         self._ids = ids

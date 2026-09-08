@@ -96,6 +96,51 @@ def test_streaming_and_download_construct_with_no_token_present(monkeypatch):
     assert download.client.authenticated is False
 
 
+class _FakeHubResp:
+    """Same shape as tests/test_hubclient.py's FakeResp, kept local so
+    this file does not depend on that module's private test helper."""
+
+    def __init__(self, body, headers=None):
+        import json as _json
+        self._b = _json.dumps(body).encode()
+        self.headers = headers or {}
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_streaming_source_reports_the_revision_captured_by_info(monkeypatch):
+    from ledger.hubclient import HubClient
+
+    client = HubClient(min_interval=0.0)
+    monkeypatch.setattr(client, "_open", lambda req, timeout=None: _FakeHubResp(
+        {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "abc123"}))
+    s = StreamingSource(client=client)
+    s.info("acme/x")
+    assert s.revision("acme/x") == "abc123"
+
+
+def test_download_source_reports_the_revision_captured_by_info(monkeypatch):
+    from ledger.hubclient import HubClient
+
+    client = HubClient(min_interval=0.0)
+    monkeypatch.setattr(client, "_open", lambda req, timeout=None: _FakeHubResp(
+        {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "def456"}))
+    s = DownloadSource(client=client)
+    s.info("acme/y")
+    assert s.revision("acme/y") == "def456"
+
+
+def test_streaming_source_revision_is_empty_before_info_is_called():
+    assert StreamingSource().revision("never/queried") == ""
+
+
 @pytest.mark.network
 def test_streaming_source_reads_a_real_small_dataset():
     # The one live test in this dispatch. lerobot/pusht is a small, well
