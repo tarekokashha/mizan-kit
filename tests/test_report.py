@@ -6,13 +6,22 @@ dataframe, the same shape and meaning as ledger.audit.audit_frame. It is
 not renamed to audit_dataframe and does not return a list, so every test
 below wraps it in a list before handing it to summarise(), exactly the
 way tests/test_audit.py calls the v0 functions.
+
+RULING 10: the v0 ground truth these equivalence tests compare against
+comes from tests/v0_reference.py, a frozen snapshot, not from
+ledger.audit. ledger/audit.py is rewritten in Task 10 into a thin CLI
+whose own audit_frame and summarise become re exports of ledger.report,
+so comparing against ledger.audit at that point would compare
+ledger.report to itself and always pass regardless of what the refactor
+did. tests/v0_reference.py cannot change out from under this test, so
+the comparison stays a real check.
 """
 import math
 
 import numpy as np
 
-from ledger.audit import audit_frame as v0_audit_frame
-from ledger.audit import summarise as v0_summarise
+from tests.v0_reference import audit_frame as v0_audit_frame
+from tests.v0_reference import summarise as v0_summarise
 from ledger.report import (
     DatasetReport, audit_frame, summarise, write_csv, append_jsonl,
     read_jsonl, PROVISIONAL_HEADER,
@@ -102,13 +111,13 @@ def test_report_reproduces_v0_exactly_for_every_defect():
     """The refactor must change nothing observable.
 
     RULING 6: report.py pools numerators and denominators across
-    episodes exactly as ledger.audit.summarise does, rather than
-    averaging per-episode fractions, which would silently give a
-    different answer whenever episodes have unequal length (the "drops"
-    defect and real Hub data both produce that). This test is the
-    guarantee that the refactor did not change that: for every defect
-    ledger.synth knows how to inject, the untouched v0 path
-    (ledger.audit.summarise + ledger.audit.audit_frame) and the new path
+    episodes exactly as v0's summarise does, rather than averaging
+    per-episode fractions, which would silently give a different answer
+    whenever episodes have unequal length (the "drops" defect and real
+    Hub data both produce that). This test is the guarantee that the
+    refactor did not change that: for every defect ledger.synth knows
+    how to inject, the frozen v0 path (tests/v0_reference.summarise +
+    tests/v0_reference.audit_frame, RULING 10) and the new path
     (ledger.report.summarise + ledger.report.audit_frame) are run over
     the identical dataframe, and the resulting flags string and every
     numeric field must match, NaN treated as equal to NaN. If this ever
