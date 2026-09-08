@@ -1,73 +1,77 @@
 """
-ledger.audit  (M-02 LEDGER, v0)
-===============================
+ledger.audit  (M-02 LEDGER)
+===========================
 
-Temporal-integrity audit for LeRobot datasets on the Hugging Face Hub.
+Thin CLI over ledger.report, ledger.census, ledger.sources and
+ledger.hubclient. This module holds no audit arithmetic of its own:
+audit_frame and summarise are re exports of ledger.report (RULING 2 and
+RULING 10 in the plan record why they keep their v0 names and shapes),
+and the two tier census logic lives entirely in ledger.census. What
+stays here is argument parsing, the small amount of legacy Hub glue the
+quick "--top N" / "--repos a,b" workflow still needs (list_top,
+load_info, sample_parquet_paths, download, read_table), and the
+offline synthetic demo.
 
-Run on the most-downloaded datasets:
+Quick workflow, unchanged from v0 (samples the first parquet file(s) of
+each named dataset; --max-mb filters by file size; --files all removes
+the file cap entirely):
     python -m ledger.audit --top 20 --files 1 --out ledger_report.csv
-
-Run on named repositories:
     python -m ledger.audit --repos lerobot/svla_so101_pickplace,lerobot/aloha_sim_insertion_human
-
-Run the synthetic demo (no network), which injects known defects and shows
-that the checks catch them:
     python -m ledger.audit --demo
 
-What it checks, per episode, then aggregated per dataset
---------------------------------------------------------
-ts_nonmonotonic_eps   episodes whose timestamp is not strictly increasing
-frac_bad_dt           fraction of frame intervals outside +/-25% of 1/fps
-                      (dropped frames, duplicated frames, or a wrong fps)
-dt_jitter_ratio       median absolute deviation of dt divided by 1/fps
-frame_gap_eps         episodes whose frame_index has holes
-stuck_state_frac      fraction of consecutive frames whose observation.state
-                      is bit-identical (a stalled sensor stream)
-identity_frac         fraction of frames where action == observation.state
-                      exactly (the "action is just the state" recording bug)
-lag_frames            the lag k (frames) at which action[t] best matches
-                      state[t+k]; healthy position-controlled arms show a
-                      small positive lag; 0 with identity_frac high is a bug;
-                      negative means the columns are probably swapped
-r_lag0 / r_best       action-state correlation at lag 0 and at the best lag
-dup_episode_frac      fraction of sampled episodes whose first 50 action
-                      frames are identical to another episode's
+Census workflow, the full two tier Hub survey described in
+docs/superpowers/specs/2026-09-05-ledger-census-design.md and
+implemented in ledger.census:
+    python -m ledger.audit --census both --sample-size 800 --seed 20260905 --out-dir census_out
+    python -m ledger.audit --census deep --source local --local-root fixtures --repos acme/x --out-dir out
 
-A `flags` column summarises which of these crossed the thresholds in
-THRESHOLDS below. Thresholds are deliberately loose for v0; calibrate them
-on known-good data (DROID, your own M-03 recordings) before naming anyone.
+--source selects what ledger.census samples parquet data through:
+stream (ledger.sources.StreamingSource, the default), download
+(ledger.sources.DownloadSource), or local (ledger.sources.LocalSource,
+which needs --local-root and is how this workflow stays testable
+offline). --resume loads whichever tier's output file already exists
+under --out-dir and skips repos already recorded there, keyed by
+repo@revision (ledger.hubclient.HubClient captures the real Hub
+revision from the X-Repo-Commit header, Ruling 9, so a dataset that
+changed since the last run is re audited rather than silently skipped).
 
-This is v0. It samples the first parquet file(s) of each dataset, so the
-numbers are estimates of prevalence, not a full census. The paper's
-prevalence table needs `--files all` and the full Hub list, which the
-overnight loop can run.
+What the audit checks, per episode, then aggregated per dataset, is
+documented in ledger.checks and ledger.report; see those modules for
+the eight measurements (frac_bad_dt, stuck_state_frac, identity_frac,
+lag_frames plus r_lag0/r_best, dup_episode_frac, ts_nonmonotonic_eps,
+frame_gap_eps) and the flags they can raise. Flags are provisional
+measurements, never a finding a dataset is "defective"; see
+ledger.report.PROVISIONAL_HEADER.
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
-import io
 import json
 import sys
 import time
 import urllib.request
-from dataclasses import dataclass, asdict, field
+from pathlib import Path
 
 import numpy as np
 
-THRESHOLDS = {
-    "frac_bad_dt": 0.05,
-    "stuck_state_frac": 0.20,
-    "identity_frac": 0.50,
-    "lag_large": 3,
-    "dup_episode_frac": 0.0,
-}
+from ledger.census import (
+    CensusConfig, build_frame, draw_sample, load_done,
+    run_deep_tier, run_metadata_tier,
+)
+from ledger.hubclient import HubClient
+from ledger.report import DatasetReport, audit_frame, summarise, write_csv
+from ledger.sources import DownloadSource, LocalSource, StreamingSource
 
-LAGS = list(range(-5, 11))
+__all__ = ["main", "parse_files", "demo", "_synthetic", "audit_frame", "summarise", "DatasetReport"]
 
 
 # --------------------------------------------------------------------------- #
-# Hub access (all optional so the demo runs offline)
+# Legacy Hub glue for the quick "--top" / "--repos" workflow. Kept as its
+# own code path rather than folded into ledger.sources: --max-mb size
+# filtering and the tree API traversal it uses have no equivalent in
+# ledger.paths.derive_paths, which trades that away deliberately (see
+# ledger/paths.py) because the tree endpoint is the one the anonymous
+# rate limit punishes hardest. All optional so --demo runs offline.
 # --------------------------------------------------------------------------- #
 def list_top(n: int) -> list[str]:
     url = f"https://huggingface.co/api/datasets?filter=LeRobot&sort=downloads&direction=-1&limit={n}"
@@ -85,7 +89,7 @@ def load_info(repo: str) -> dict | None:
         return None
 
 
-def sample_parquet_paths(repo: str, max_files: int, max_mb: float) -> list[str]:
+def sample_parquet_paths(repo: str, max_files: int | None, max_mb: float) -> list[str]:
     from huggingface_hub import HfApi
 
     api = HfApi()
@@ -119,163 +123,7 @@ def read_table(local_path: str):
     return pq.read_table(local_path).to_pandas()
 
 
-# --------------------------------------------------------------------------- #
-# Checks
-# --------------------------------------------------------------------------- #
-@dataclass
-class DatasetReport:
-    repo: str
-    codebase: str = ""
-    fps: float = float("nan")
-    episodes_sampled: int = 0
-    frames_sampled: int = 0
-    ts_nonmonotonic_eps: int = 0
-    frac_bad_dt: float = float("nan")
-    dt_jitter_ratio: float = float("nan")
-    frame_gap_eps: int = 0
-    stuck_state_frac: float = float("nan")
-    identity_frac: float = float("nan")
-    lag_frames: float = float("nan")
-    r_lag0: float = float("nan")
-    r_best: float = float("nan")
-    dup_episode_frac: float = float("nan")
-    flags: str = ""
-    note: str = ""
-
-
-def _stack(col) -> np.ndarray | None:
-    try:
-        arr = np.stack([np.asarray(v, dtype=np.float64) for v in col])
-        return arr if arr.ndim == 2 else None
-    except Exception:
-        return None
-
-
-def _xcorr_lag(action: np.ndarray, state: np.ndarray) -> tuple[int, float, float]:
-    """Return (best_lag, r_at_lag0, r_at_best) with r averaged over dimensions."""
-    T = len(action)
-    if T < 30:
-        return 0, float("nan"), float("nan")
-    a = action - action.mean(0)
-    s = state - state.mean(0)
-    sa = a.std(0) + 1e-9
-    ss = s.std(0) + 1e-9
-    scores = {}
-    for k in LAGS:
-        if k >= 0:
-            aa, st = a[: T - k], s[k:]
-        else:
-            aa, st = a[-k:], s[: T + k]
-        if len(aa) < 20:
-            continue
-        r = ((aa * st).mean(0)) / (sa * ss)
-        scores[k] = float(np.nanmean(r))
-    if not scores:
-        return 0, float("nan"), float("nan")
-    best = max(scores, key=scores.get)
-    return best, scores.get(0, float("nan")), scores[best]
-
-
-def audit_frame(df, fps: float) -> dict:
-    """Run every check on a dataframe holding one or more episodes."""
-    out = dict(episodes=0, frames=int(len(df)), ts_nonmono=0, bad_dt=0, n_dt=0, dts=[],
-               frame_gap=0, stuck=0, n_stuck=0, ident=0, n_ident=0, lags=[], r0=[], rb=[], hashes=[])
-    if "episode_index" not in df:
-        df = df.assign(episode_index=0)
-    has_state = "observation.state" in df
-    has_action = "action" in df
-    expected = 1.0 / fps if fps and fps > 0 else float("nan")
-    for _, ep in df.groupby("episode_index", sort=True):
-        out["episodes"] += 1
-        if "timestamp" in ep:
-            ts = np.asarray(ep["timestamp"], dtype=np.float64)
-            if len(ts) > 1:
-                dt = np.diff(ts)
-                if np.any(dt <= 0):
-                    out["ts_nonmono"] += 1
-                if np.isfinite(expected):
-                    out["bad_dt"] += int(np.sum(np.abs(dt - expected) > 0.25 * expected))
-                    out["n_dt"] += len(dt)
-                    out["dts"].extend(dt.tolist())
-        if "frame_index" in ep:
-            fi = np.asarray(ep["frame_index"], dtype=np.int64)
-            if len(fi) > 1 and np.any(np.diff(fi) != 1):
-                out["frame_gap"] += 1
-        st = _stack(ep["observation.state"]) if has_state else None
-        ac = _stack(ep["action"]) if has_action else None
-        if st is not None and len(st) > 1:
-            same = np.all(st[1:] == st[:-1], axis=1)
-            out["stuck"] += int(same.sum())
-            out["n_stuck"] += len(same)
-        if st is not None and ac is not None and st.shape == ac.shape:
-            eq = np.all(np.isclose(ac, st, atol=0.0), axis=1)
-            out["ident"] += int(eq.sum())
-            out["n_ident"] += len(eq)
-            lag, r0, rb = _xcorr_lag(ac, st)
-            if np.isfinite(rb):
-                out["lags"].append(lag)
-                out["r0"].append(r0)
-                out["rb"].append(rb)
-        if ac is not None:
-            head = np.round(ac[:50], 4).tobytes()
-            out["hashes"].append(hashlib.md5(head).hexdigest())
-    return out
-
-
-def summarise(repo: str, info: dict | None, parts: list[dict]) -> DatasetReport:
-    rep = DatasetReport(repo=repo)
-    if info:
-        rep.codebase = str(info.get("codebase_version", ""))
-        rep.fps = float(info.get("fps", float("nan")))
-    if not parts:
-        rep.note = "no data sampled"
-        return rep
-    eps = sum(p["episodes"] for p in parts)
-    rep.episodes_sampled = eps
-    rep.frames_sampled = sum(p["frames"] for p in parts)
-    rep.ts_nonmonotonic_eps = sum(p["ts_nonmono"] for p in parts)
-    n_dt = sum(p["n_dt"] for p in parts)
-    rep.frac_bad_dt = (sum(p["bad_dt"] for p in parts) / n_dt) if n_dt else float("nan")
-    dts = np.concatenate([np.asarray(p["dts"]) for p in parts if p["dts"]]) if any(p["dts"] for p in parts) else None
-    if dts is not None and np.isfinite(rep.fps) and rep.fps > 0:
-        mad = float(np.median(np.abs(dts - np.median(dts))))
-        rep.dt_jitter_ratio = mad * rep.fps
-    rep.frame_gap_eps = sum(p["frame_gap"] for p in parts)
-    n_stuck = sum(p["n_stuck"] for p in parts)
-    rep.stuck_state_frac = (sum(p["stuck"] for p in parts) / n_stuck) if n_stuck else float("nan")
-    n_ident = sum(p["n_ident"] for p in parts)
-    rep.identity_frac = (sum(p["ident"] for p in parts) / n_ident) if n_ident else float("nan")
-    lags = sum((p["lags"] for p in parts), [])
-    if lags:
-        rep.lag_frames = float(np.median(lags))
-        rep.r_lag0 = float(np.nanmean(sum((p["r0"] for p in parts), [])))
-        rep.r_best = float(np.nanmean(sum((p["rb"] for p in parts), [])))
-    hashes = sum((p["hashes"] for p in parts), [])
-    if hashes:
-        rep.dup_episode_frac = 1.0 - len(set(hashes)) / len(hashes)
-    flags = []
-    if rep.ts_nonmonotonic_eps:
-        flags.append("ts_nonmonotonic")
-    if np.isfinite(rep.frac_bad_dt) and rep.frac_bad_dt > THRESHOLDS["frac_bad_dt"]:
-        flags.append("bad_dt")
-    if rep.frame_gap_eps:
-        flags.append("frame_gaps")
-    if np.isfinite(rep.stuck_state_frac) and rep.stuck_state_frac > THRESHOLDS["stuck_state_frac"]:
-        flags.append("stuck_state")
-    if np.isfinite(rep.identity_frac) and rep.identity_frac > THRESHOLDS["identity_frac"]:
-        flags.append("action_equals_state")
-    if np.isfinite(rep.lag_frames):
-        if rep.lag_frames < 0:
-            flags.append("negative_lag")
-        elif rep.lag_frames >= THRESHOLDS["lag_large"]:
-            flags.append("large_lag")
-    if np.isfinite(rep.dup_episode_frac) and rep.dup_episode_frac > THRESHOLDS["dup_episode_frac"]:
-        flags.append("duplicate_episodes")
-    rep.flags = "|".join(flags)
-    return rep
-
-
-def audit_repo(repo: str, max_files: int, max_mb: float) -> DatasetReport:
+def audit_repo(repo: str, max_files: int | None, max_mb: float) -> DatasetReport:
     info = load_info(repo)
     if info is None:
         return DatasetReport(repo=repo, note="no meta/info.json (gated, missing, or not LeRobot)")
@@ -293,7 +141,13 @@ def audit_repo(repo: str, max_files: int, max_mb: float) -> DatasetReport:
 
 
 # --------------------------------------------------------------------------- #
-# Synthetic demo: inject defects, prove the checks see them
+# Synthetic demo: inject defects, prove the checks see them. Kept here
+# rather than in ledger.synth: ledger.synth.make_episodes is the shared
+# generator every other test in the suite draws on, with its own
+# n_joints/seed/noise knobs; _synthetic is v0's own narrower signature,
+# preserved verbatim (down to its fixed seed 0 and 6 joints) so that
+# tests/test_audit.py, which imports it by name, keeps testing the
+# actual thing v0 shipped rather than a reimplementation of it.
 # --------------------------------------------------------------------------- #
 def _synthetic(fps: float = 30.0, n_eps: int = 6, T: int = 300, lag: int = 2, defect: str = "") -> "pandas.DataFrame":
     import pandas as pd
@@ -325,7 +179,14 @@ def _synthetic(fps: float = 30.0, n_eps: int = 6, T: int = 300, lag: int = 2, de
     return pd.DataFrame(rows)
 
 
-def demo() -> None:
+def demo(out: str | None = None) -> list[DatasetReport]:
+    """Run the offline synthetic demo and print the flags table.
+
+    When `out` is given, also writes the reports there via
+    ledger.report.write_csv, PROVISIONAL_HEADER and all. This is how
+    tests/golden/demo_report.csv is produced; a bare --demo with no
+    --out, exactly like v0, only prints and touches no disk.
+    """
     print("Synthetic demo: each row injects one defect; the flags column should name it.\n")
     rows = []
     for defect in ["", "identity", "drops", "stuck", "swapped", "duplicate"]:
@@ -333,6 +194,60 @@ def demo() -> None:
         rep = summarise(f"synthetic/{defect or 'clean'}", {"codebase_version": "demo", "fps": 30}, [audit_frame(df, 30.0)])
         rows.append(rep)
     _print_table(rows)
+    if out:
+        write_csv(rows, out)
+        print(f"\nwrote {out}")
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Census workflow: argument driven wiring over ledger.census.
+# --------------------------------------------------------------------------- #
+def _build_source(args):
+    if args.source == "local":
+        if not args.local_root:
+            raise SystemExit("--source local requires --local-root")
+        return LocalSource(args.local_root)
+    if args.source == "download":
+        return DownloadSource()
+    return StreamingSource()
+
+
+def run_census(args) -> int:
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    source = _build_source(args)
+
+    if args.repos:
+        frame = [r for r in args.repos.split(",") if r]
+    elif args.source == "local":
+        print("error: --source local requires --repos (there is no Hub to crawl for a frame)",
+              file=sys.stderr)
+        return 2
+    else:
+        client = getattr(source, "client", None) or HubClient()
+        frame = build_frame(client)
+
+    sample = draw_sample(frame, args.sample_size, args.seed)
+    cfg = CensusConfig(out_dir=out_dir, sample_size=args.sample_size, seed=args.seed,
+                       files_per_dataset=args.files, tier=args.census)
+
+    written = 0
+    if args.census in ("metadata", "both"):
+        meta_path = out_dir / "metadata.jsonl"
+        done = load_done(meta_path) if args.resume else set()
+        n = run_metadata_tier(sample, source, meta_path, done=done)
+        written += n
+        print(f"metadata tier: {n} record(s) -> {meta_path}", file=sys.stderr)
+    if args.census in ("deep", "both"):
+        deep_path = out_dir / "deep.jsonl"
+        done = load_done(deep_path) if args.resume else set()
+        n = run_deep_tier(sample, source, cfg, deep_path, done=done)
+        written += n
+        print(f"deep tier: {n} record(s) -> {deep_path}", file=sys.stderr)
+
+    print(f"census: {written} record(s) written under {out_dir}")
+    return 0
 
 
 # --------------------------------------------------------------------------- #
@@ -353,24 +268,58 @@ def _fmt(v) -> str:
     return str(v)
 
 
+def parse_files(value: str) -> int | None:
+    """argparse type for --files: the literal "all" means no cap
+    (None, threaded through to sample_parquet_paths / ledger.census as
+    "sample every file"); anything else must parse as an int. Raises
+    argparse.ArgumentTypeError, not ValueError, so argparse reports it
+    as a usage error rather than a traceback.
+    """
+    if value == "all":
+        return None
+    try:
+        return int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"--files must be an integer or 'all', got {value!r}") from e
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--top", type=int, default=0, help="audit the N most-downloaded LeRobot datasets")
-    ap.add_argument("--repos", type=str, default="", help="comma-separated repo ids to audit")
-    ap.add_argument("--files", type=int, default=1, help="parquet files to sample per dataset")
-    ap.add_argument("--max-mb", type=float, default=150.0, help="prefer parquet files under this size")
-    ap.add_argument("--out", type=str, default="ledger_report.csv")
+    ap.add_argument("--repos", type=str, default="",
+                    help="comma-separated repo ids; the quick audit's target list, or the census frame when given")
+    ap.add_argument("--files", type=parse_files, default=1,
+                    help="parquet files to sample per dataset; an integer, or 'all' for every file")
+    ap.add_argument("--max-mb", type=float, default=150.0, help="prefer parquet files under this size (quick workflow only)")
+    ap.add_argument("--out", type=str, default=None,
+                    help="CSV path for the quick workflow (default ledger_report.csv); "
+                         "with --demo, only written if this is given")
     ap.add_argument("--demo", action="store_true", help="run the offline synthetic demo")
+
+    census = ap.add_argument_group("census", "the two tier Hub survey; see ledger.census")
+    census.add_argument("--census", choices=("metadata", "deep", "both"), default=None,
+                        help="run the census instead of the quick audit")
+    census.add_argument("--sample-size", type=int, default=800, help="datasets drawn from the frame")
+    census.add_argument("--seed", type=int, default=20260905, help="seed for the sample draw")
+    census.add_argument("--resume", action="store_true", help="skip repos already recorded under --out-dir")
+    census.add_argument("--out-dir", type=str, default="census_out", help="directory for metadata.jsonl / deep.jsonl")
+    census.add_argument("--source", choices=("stream", "download", "local"), default="stream",
+                        help="where the census samples parquet data from")
+    census.add_argument("--local-root", type=str, default=None, help="fixture root for --source local")
+
     args = ap.parse_args(argv)
 
     if args.demo:
-        demo()
+        demo(args.out)
         return 0
+    if args.census:
+        return run_census(args)
+
     repos = [r for r in args.repos.split(",") if r]
     if args.top:
         repos = list_top(args.top) + repos
     if not repos:
-        ap.error("give --top N, --repos a,b or --demo")
+        ap.error("give --top N, --repos a,b, --demo or --census")
     reps: list[DatasetReport] = []
     for i, repo in enumerate(repos, 1):
         t0 = time.time()
@@ -378,14 +327,9 @@ def main(argv=None) -> int:
         reps.append(audit_repo(repo, args.files, args.max_mb))
         print(f"      done in {time.time() - t0:.1f}s  flags={reps[-1].flags or '-'}", file=sys.stderr)
     _print_table(reps)
-    import csv
-
-    with open(args.out, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(asdict(reps[0]).keys()))
-        w.writeheader()
-        for r in reps:
-            w.writerow(asdict(r))
-    print(f"\nwrote {args.out}")
+    out = args.out or "ledger_report.csv"
+    write_csv(reps, out)
+    print(f"\nwrote {out}")
     return 0
 
 
