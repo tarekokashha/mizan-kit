@@ -59,14 +59,112 @@ you open the dataset and confirm it; that rule is in `CLAUDE.md`.
 - `.github/workflows/ursim-ci.yml` : runs URSim as a service container and
   the smoke test on every push. Hardware-in-the-loop CI with no arm.
 
+
+## 4. `ledger/` census : the Hub wide survey (M-02, v1)
+
+The v0 audit above samples named datasets. The census surveys the whole
+LeRobot population and reports prevalence with confidence intervals.
+
+```
+python -m ledger.audit --census metadata --out-dir census_out
+python -m ledger.audit --census deep --sample-size 800 --seed 20260905 --out-dir census_out --resume
+```
+
+### Two tiers, and why it is not an exhaustive crawl
+
+Tier 1, metadata, visits every LeRobot dataset and records codebase version,
+fps, episode and frame counts, and the feature schema. Tier 2, deep, runs the
+temporal checks over a seeded random sample drawn from that frame.
+
+Prevalence is a binomial proportion, so it is reported through
+`cairo_protocol.wilson_interval` and never as a bare rate. A sample of 800
+datasets pins any prevalence to about plus or minus 2.8 points at 95 percent,
+and 1600 to about 2.0 points.
+
+An exhaustive every file crawl is not attempted. These are measurements taken
+from this machine on 5 September 2026, not estimates:
+
+| finding | value |
+|---------|-------|
+| LeRobot datasets on the Hub | at least 12,000, cursor paginated at 1000 per page |
+| anonymous rate limit | HTTP 429 within tens of requests, on both the api and resolve hosts |
+| v2.0 layout | one parquet per episode; `IPEC-COMMUNITY/kuka_lerobot` alone is 209,880 files |
+| v3.0 layout | episodes packed into large files |
+| audit columns | 2.7 percent of compressed parquet bytes, so streaming transfers roughly 37x fewer bytes than downloading |
+| `meta/info.json` | carries a `data_path` template, so paths are derived and no tree API call is needed |
+
+Across at least 12,000 datasets that is tens of millions of requests against a
+free service. A partial crawl also has no sampling frame, so it supports no
+prevalence claim at all. A seeded random sample is both cheaper and more
+defensible, and the draw is recorded before the run in the same spirit as
+`protocols/PROTOCOL_TEMPLATE.md`.
+
+### A token is required
+
+Anonymous requests are rate limited within about a minute. Set one of:
+
+```
+huggingface-cli login
+$env:HF_TOKEN = "hf_..."        # PowerShell, current session only
+```
+
+The token is read from `HF_TOKEN` or the CLI cache. It is never written to the
+repository and never logged.
+
+### Resume
+
+Each dataset appends one JSONL record keyed by `repo@revision`, flushed per
+dataset rather than at the end. The revision is the real Hub sha, taken from
+the `X-Repo-Commit` header of a response the run already makes. Re running
+with `--resume` skips what is already recorded, so a crash at dataset 3,000
+costs one dataset and not the run, and a dataset that changed on the Hub is
+audited again rather than skipped.
+
+### Flags are provisional
+
+Every CSV carries a header saying so. `flags` are automated measurements; the
+`confirmed` column stays empty until a human opens the data. Nothing in this
+tooling calls a dataset defective, per `CLAUDE.md`.
+
+### Known limitation: lag on low degree of freedom arms
+
+`lag_frames` is estimated by cross correlating action against state. Below 6
+action dimensions the correlation differs so little between adjacent lags that
+the argmax is not reliably the true lag: measured exact match was 96.5 to 97
+percent at 2 joints, against 0 to 2 mismatches per 6000 to 8000 trials at 6
+joints and above. Treat `large_lag` and `negative_lag` as uninformative for
+datasets with fewer than 6 action dimensions and confirm by hand. The full
+measurement is in `docs/calibration.md`.
+
 ## Run everything
 
 ```
 pip install -r requirements.txt
-pytest -q                     # 8 tests
+pytest -q
 python -m ledger.audit --demo
 make ursim && sleep 60 && python -m lerobot_ur.ursim_smoke
 ```
+
+### On Windows
+
+Windows does not ship GNU make, so the `Makefile` targets above do not run.
+The PowerShell equivalents are:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pytest -q                       # make test
+.\.venv\Scripts\python.exe -m ledger.audit --demo             # make demo
+.\.venv\Scripts\python.exe -m ledger.audit --top 50 --files 1 --out ledger_report.csv   # make audit
+docker run --rm -d --name ursim -p 5900:5900 -p 6080:6080 -p 29999:29999 -p 30001-30004:30001-30004 universalrobots/ursim_e-series   # make ursim
+```
+
+Live Hub tests are deselected by default. Run them with `-m network`.
+
+The M-03 URSim jitter gate is a Linux target. Docker Desktop on Windows adds a
+WSL2 network hop and Windows has a coarse default timer, so a p99.9 jitter
+figure measured there describes the host, not the robot stack. Run that gate
+on Linux.
 
 ## The rules
 
