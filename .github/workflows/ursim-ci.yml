@@ -1,6 +1,10 @@
 name: ursim-ci
 # Hardware-in-the-loop CI against the real Universal Robots controller
 # software, with no arm in the room. Gate: RTDE stream >= 480 Hz, p99.9 jitter < 2.5 ms.
+#
+# The offline suite lives in tests.yml and is the gate that must be green on
+# every push. This job is heavier and depends on a controller container, so a
+# failure here means the hardware path, not the library.
 on: [push, pull_request]
 jobs:
   smoke:
@@ -23,4 +27,7 @@ jobs:
         run: |
           for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/29999) 2>/dev/null && break; sleep 2; done
       - run: python -m lerobot_ur.ursim_smoke --ip 127.0.0.1 --seconds 5
-      - run: pip install pytest scipy pandas pyarrow && pytest -q
+      - name: Install the package and its test extra
+        run: pip install -e ".[test]"
+      - name: Offline suite, as a second check alongside the ursim gate
+        run: python -m pytest

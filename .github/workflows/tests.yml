@@ -1,0 +1,86 @@
+name: tests
+# The offline suite. No Docker, no hardware, no network. This is the gate
+# that must be green on every push. The URSim job in ursim-ci.yml is a
+# separate, heavier gate that needs a controller container.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: py${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install the package and its test extra
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
+
+      - name: Run the offline suite
+        # Live Hub tests carry the network marker and are deselected here.
+        run: python -m pytest
+
+      - name: Run the doctests in cairo_protocol
+        run: python -m doctest cairo_protocol/stats.py -v | tail -1
+
+      - name: The demo must still reproduce the pinned golden report
+        run: python -m ledger.audit --demo
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: python -m pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  conventions:
+    name: repo conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No em dashes in prose or code
+        # CLAUDE.md: plain sentences, no em dashes anywhere.
+        run: |
+          if git grep -n -- '—' -- . ':(exclude)docs/superpowers/*'; then
+            echo "::error::em dash found; CLAUDE.md forbids them"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: No dataset is ever labelled defective
+        # CLAUDE.md: a LEDGER finding is provisional until a human confirms it.
+        run: |
+          if git grep -nEi 'is (a )?defective|marked defective|defective dataset' -- ledger/; then
+            echo "::error::a dataset is being labelled defective"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: No committed Hugging Face token
+        run: |
+          if git grep -nE 'hf_[A-Za-z0-9]{20,}' -- .; then
+            echo "::error::what looks like a Hugging Face token is committed"
+            exit 1
+          fi
+          echo "clean"
