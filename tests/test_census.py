@@ -141,6 +141,66 @@ def test_deep_tier_resume_skips_repos_already_in_done(tmp_path):
     assert [r["repo"] for r in rows] == ["acme/b"]
 
 
+class _NoExistsLocalSource:
+    """LocalSource minus its exists() method: standing in for a
+    SampleSource that cannot check whether a path is present (IMPORTANT
+    3's fallback case), while still serving real fixture data so the
+    audit itself succeeds.
+    """
+
+    def __init__(self, root):
+        self._local = LocalSource(root)
+
+    def info(self, repo):
+        return self._local.info(repo)
+
+    def parquet_paths(self, repo, info, limit=None):
+        return self._local.parquet_paths(repo, info, limit)
+
+    def frames(self, repo, path):
+        return self._local.frames(repo, path)
+
+
+def test_deep_tier_notes_a_partial_sample_when_the_source_cannot_check_existence(tmp_path):
+    # IMPORTANT 3: --files all (files_per_dataset=None) on a packed
+    # dataset, through a source that cannot answer whether a path
+    # exists, must not silently claim full coverage. The report's note
+    # says so.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=None)
+    n = run_deep_tier(["acme/a"], _NoExistsLocalSource(root), cfg, out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert not rows[0]["error"]
+    assert "partial" in rows[0]["note"]
+
+
+def test_deep_tier_does_not_note_partial_when_files_per_dataset_is_bounded(tmp_path):
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
+    n = run_deep_tier(["acme/a"], _NoExistsLocalSource(root), cfg, out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert rows[0]["note"] == ""
+
+
+def test_deep_tier_does_not_note_partial_when_the_source_can_check_existence(tmp_path):
+    # A real LocalSource has exists(); files_per_dataset=None must not
+    # be flagged partial just because the layout is packed.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    out = tmp_path / "deep.jsonl"
+    cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=None)
+    n = run_deep_tier(["acme/a"], LocalSource(root), cfg, out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert rows[0]["note"] == ""
+
+
 def test_metadata_tier_writes_one_record_per_dataset(tmp_path):
     # CRITICAL 1: tier 1 is sold (README, design doc section 3) as
     # recording codebase version, fps, episode and frame counts, chunk

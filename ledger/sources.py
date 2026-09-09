@@ -4,6 +4,15 @@ Four implementations behind one protocol, so the checks never learn
 whether they are reading the Hub, a fixture, or a generator. Measured on
 2026-09-05: the five audit columns are 2.7 percent of compressed bytes,
 so projecting is worth roughly 37x in transfer.
+
+IMPORTANT 3: LocalSource, StreamingSource and DownloadSource also carry
+an exists(repo, path) -> bool method, the same optional, duck-typed
+extra capability revision() already is (Ruling 9): not part of the
+SampleSource Protocol below, checked with getattr where it matters
+(ledger.paths.derive_paths's `exists` parameter, via each source's own
+parquet_paths). SyntheticSource has no real files to check, so it has
+none; ledger.paths.packed_sample_is_partial is how a caller notices
+that and records the resulting sample as partial rather than complete.
 """
 from __future__ import annotations
 
@@ -43,6 +52,10 @@ class LocalSource:
     def info(self, repo: str) -> dict | None:
         p = self.root / repo / "meta/info.json"
         return json.loads(p.read_text()) if p.exists() else None
+
+    def exists(self, repo: str, path: str) -> bool:
+        """Whether `path` (relative to the repo root) is on disk."""
+        return (self.root / repo / path).exists()
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
         found = sorted(str(p.relative_to(self.root / repo).as_posix())
@@ -91,8 +104,18 @@ class StreamingSource:
         """
         return self.client.get_revision(repo)
 
+    def exists(self, repo: str, path: str) -> bool:
+        """Whether `path` is present in the repo on the Hub.
+
+        Uses HfFileSystem's own metadata check, no file content is
+        transferred, the "file system object" derive_paths's `exists`
+        parameter needs to probe a packed dataset's file indices when
+        limit is None (IMPORTANT 3).
+        """
+        return self._fs.exists(f"datasets/{repo}/{path}")
+
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
-        return derive_paths(info, limit)
+        return derive_paths(info, limit, exists=lambda p: self.exists(repo, p))
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
         with self._fs.open(f"datasets/{repo}/{path}", "rb") as fh:
@@ -105,6 +128,8 @@ class DownloadSource:
     def __init__(self, client: HubClient | None = None, keep: bool = False):
         self.client = client or HubClient()
         self.keep = keep
+        from huggingface_hub import HfFileSystem
+        self._fs = HfFileSystem()
 
     def info(self, repo: str) -> dict | None:
         return self.client.get_info(repo)
@@ -113,8 +138,14 @@ class DownloadSource:
         """See StreamingSource.revision: proxies HubClient.get_revision."""
         return self.client.get_revision(repo)
 
+    def exists(self, repo: str, path: str) -> bool:
+        """See StreamingSource.exists: same HfFileSystem metadata check,
+        used to discover every file of a packed dataset (IMPORTANT 3).
+        """
+        return self._fs.exists(f"datasets/{repo}/{path}")
+
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
-        return derive_paths(info, limit)
+        return derive_paths(info, limit, exists=lambda p: self.exists(repo, p))
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
         from huggingface_hub import hf_hub_download

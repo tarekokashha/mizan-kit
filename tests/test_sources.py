@@ -40,6 +40,15 @@ def test_local_missing_repo_returns_none(tmp_path):
     assert LocalSource(tmp_path).info("acme/nope") is None
 
 
+def test_local_exists_checks_the_filesystem(v30):
+    # IMPORTANT 3: LocalSource's own existence check, used by
+    # ledger.paths.derive_paths to discover every file of a packed
+    # dataset under limit=None instead of silently sampling one.
+    s = LocalSource(v30)
+    assert s.exists("acme/v30", "data/chunk-000/file-000.parquet") is True
+    assert s.exists("acme/v30", "data/chunk-000/file-999.parquet") is False
+
+
 def test_synthetic_source_is_offline():
     s = SyntheticSource(defect="stuck")
     info = s.info("synthetic/stuck")
@@ -139,6 +148,60 @@ def test_download_source_reports_the_revision_captured_by_info(monkeypatch):
 
 def test_streaming_source_revision_is_empty_before_info_is_called():
     assert StreamingSource().revision("never/queried") == ""
+
+
+# --------------------------------------------------------------------------- #
+# IMPORTANT 3: --files all silently sampled one file for every packed (v3.0)
+# dataset. The fix gives the Hub backed sources an exists() check so
+# ledger.paths.derive_paths can probe for every real file instead of
+# guessing. Only _fs.exists is monkeypatched below; nothing touches the
+# network.
+# --------------------------------------------------------------------------- #
+def test_streaming_source_exists_uses_the_hf_filesystem(monkeypatch):
+    s = StreamingSource()
+    seen = {}
+
+    def fake_exists(path):
+        seen["path"] = path
+        return True
+
+    monkeypatch.setattr(s._fs, "exists", fake_exists)
+    assert s.exists("acme/x", "data/chunk-000/file-000.parquet") is True
+    assert seen["path"] == "datasets/acme/x/data/chunk-000/file-000.parquet"
+
+
+def test_download_source_exists_uses_the_hf_filesystem(monkeypatch):
+    s = DownloadSource()
+    monkeypatch.setattr(s._fs, "exists", lambda path: False)
+    assert s.exists("acme/x", "data/chunk-000/file-000.parquet") is False
+
+
+def test_streaming_source_parquet_paths_discovers_every_packed_file_under_limit_none(monkeypatch):
+    # End to end: parquet_paths(limit=None) on a packed dataset must
+    # probe via the source's own exists() rather than silently sampling
+    # one file.
+    info = {"codebase_version": "v3.0", "fps": 30, "chunks_size": 1000,
+            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+    present = {"data/chunk-000/file-000.parquet", "data/chunk-000/file-001.parquet",
+              "data/chunk-000/file-002.parquet"}
+    s = StreamingSource()
+    monkeypatch.setattr(s._fs, "exists",
+                        lambda path: path.removeprefix("datasets/acme/x/") in present)
+    paths = s.parquet_paths("acme/x", info, limit=None)
+    assert paths == ["data/chunk-000/file-000.parquet",
+                     "data/chunk-000/file-001.parquet",
+                     "data/chunk-000/file-002.parquet"]
+
+
+def test_download_source_parquet_paths_discovers_every_packed_file_under_limit_none(monkeypatch):
+    info = {"codebase_version": "v3.0", "fps": 30, "chunks_size": 1000,
+            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+    present = {"data/chunk-000/file-000.parquet"}
+    s = DownloadSource()
+    monkeypatch.setattr(s._fs, "exists",
+                        lambda path: path.removeprefix("datasets/acme/x/") in present)
+    paths = s.parquet_paths("acme/x", info, limit=None)
+    assert paths == ["data/chunk-000/file-000.parquet"]
 
 
 @pytest.mark.network

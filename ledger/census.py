@@ -49,7 +49,7 @@ from pathlib import Path
 import numpy as np
 
 from cairo_protocol.stats import wilson_interval
-from ledger.paths import layout_family
+from ledger.paths import layout_family, packed_sample_is_partial
 from ledger.report import DatasetReport, append_jsonl, audit_frame, summarise
 
 
@@ -58,7 +58,7 @@ class CensusConfig:
     out_dir: Path
     sample_size: int = 800
     seed: int = 20260905
-    files_per_dataset: int = 1
+    files_per_dataset: int | None = 1  # None means every file ("--files all")
     max_datasets: int | None = None
     tier: str = "both"
 
@@ -234,6 +234,15 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
     run_metadata_tier. The revision recorded on a successful report is
     always the post-info() read, which is the one a subsequent
     load_done() will see.
+
+    IMPORTANT 3: cfg.files_per_dataset=None ("--files all") on a packed
+    dataset only samples every file when source.parquet_paths can
+    actually discover them (ledger.paths.derive_paths's `exists`
+    parameter; LocalSource, StreamingSource and DownloadSource all
+    supply one). When the source cannot answer that,
+    ledger.paths.packed_sample_is_partial says so, and the report's
+    note records the sample as partial rather than silently claiming
+    full coverage it does not have.
     """
     done = done if done is not None else set()
     get_revision = getattr(source, "revision", None)
@@ -254,6 +263,9 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
             parts = [audit_frame(source.frames(repo, p), fps) for p in paths]
             rep = summarise(repo, info, parts)
             rep.source = type(source).__name__
+            has_exists = callable(getattr(source, "exists", None))
+            if packed_sample_is_partial(info, cfg.files_per_dataset, has_exists):
+                rep.note = "partial: packed layout, source has no existence check, sampled 1 file only"
         except Exception as e:  # noqa: BLE001 - graceful degradation is the point
             rep = DatasetReport(repo=repo, source=type(source).__name__,
                                 error=f"{type(e).__name__}: {e}")

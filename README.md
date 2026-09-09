@@ -73,8 +73,19 @@ python -m ledger.audit --census deep --sample-size 800 --seed 20260905 --out-dir
 ### Two tiers, and why it is not an exhaustive crawl
 
 Tier 1, metadata, visits every LeRobot dataset and records codebase version,
-fps, episode and frame counts, and the feature schema. Tier 2, deep, runs the
-temporal checks over a seeded random sample drawn from that frame.
+fps, episode and frame counts, chunk size, layout family and the feature
+schema. Tier 2, deep, runs the temporal checks over a seeded random sample
+drawn from that frame.
+
+Tier 2's `--files` picks how many parquet files are sampled per dataset, an
+integer or `all`. For a per-episode (v2.0) layout `all` is exact, since the
+episode count is already in `info.json`. For a packed (v3.0) layout the file
+count is not in `info.json` at all (see the table below), so `all` instead
+probes file indices one at a time and stops at the first one that is not
+there; that needs the source to be able to check whether a path exists,
+which `--source stream`, `download` and `local` all can. A source that
+cannot falls back to sampling one file and marks that report's `note` column
+partial, rather than silently claiming full coverage it did not have.
 
 Prevalence is a binomial proportion, so it is reported through
 `cairo_protocol.wilson_interval` and never as a bare rate. A sample of 800

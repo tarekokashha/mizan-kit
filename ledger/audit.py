@@ -34,6 +34,18 @@ under --out-dir and skips repos already recorded there, keyed by
 repo@revision (ledger.hubclient.HubClient captures the real Hub
 revision from the X-Repo-Commit header, Ruling 9, so a dataset that
 changed since the last run is re audited rather than silently skipped).
+A record whose error names a rate limit is not treated as done, so a
+later --resume run retries it instead of treating an exhausted backoff
+as finished work (CRITICAL 2).
+
+--files all is not the same guarantee on both layouts (IMPORTANT 3). A
+per-episode (v2.x) dataset's file count is in info.json, so all is
+exact. A packed (v3.x) dataset's file count is not, so all instead
+probes file indices through the source's own existence check
+(ledger.sources.*.exists; stream, download and local all have one) and
+stops at the first missing one; a source that cannot check existence
+falls back to one file and the report's note records that sample as
+partial.
 
 What the audit checks, per episode, then aggregated per dataset, is
 documented in ledger.checks and ledger.report; see those modules for
@@ -280,7 +292,11 @@ def main(argv=None) -> int:
     ap.add_argument("--repos", type=str, default="",
                     help="comma-separated repo ids; the quick audit's target list, or the census frame when given")
     ap.add_argument("--files", type=parse_files, default=1,
-                    help="parquet files to sample per dataset; an integer, or 'all' for every file")
+                    help="parquet files to sample per dataset; an integer, or 'all' for every file. "
+                         "In the census workflow, 'all' is exact for a per-episode (v2.x) layout "
+                         "but for a packed (v3.x) layout it probes file indices via the source's "
+                         "existence check and stops at the first missing one, falling back to one "
+                         "file (noted as partial on the report) if the source cannot check")
     ap.add_argument("--max-mb", type=float, default=150.0, help="prefer parquet files under this size (quick workflow only)")
     ap.add_argument("--out", type=str, default=None,
                     help="CSV path for the quick workflow (default ledger_report.csv); "
