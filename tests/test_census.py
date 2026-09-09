@@ -11,7 +11,7 @@ import pytest
 
 from ledger.census import (
     CensusConfig, build_frame, draw_sample, load_done,
-    run_deep_tier, run_metadata_tier, prevalence,
+    run_census, run_deep_tier, run_metadata_tier, prevalence,
 )
 from ledger.report import DatasetReport
 from ledger.sources import LocalSource
@@ -244,6 +244,63 @@ def test_local_source_without_a_revision_method_still_keys_repo_at_bare(tmp_path
     rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
     assert rows[0]["revision"] == ""
     assert load_done(out) == {"acme/a@"}
+
+
+def test_run_census_metadata_tier_only_leaves_deep_jsonl_absent(tmp_path):
+    # cfg.tier is the only tier switch run_census honours. "metadata"
+    # must run the metadata tier and must not touch the deep tier at
+    # all, proven by deep.jsonl never being created.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=2, T=40, seed=1), root, "acme/a")
+    cfg = CensusConfig(out_dir=tmp_path, tier="metadata", files_per_dataset=1)
+    n = run_census(["acme/a"], LocalSource(root), cfg, out_dir=tmp_path)
+    assert n == 1
+    meta_path = tmp_path / "metadata.jsonl"
+    deep_path = tmp_path / "deep.jsonl"
+    assert meta_path.exists()
+    rows = [json.loads(l) for l in meta_path.read_text().strip().splitlines()]
+    assert [r["repo"] for r in rows] == ["acme/a"]
+    assert not deep_path.exists()
+
+
+def test_run_census_deep_tier_only_leaves_metadata_jsonl_absent(tmp_path):
+    # Symmetric case: cfg.tier="deep" must run only the deep tier, so
+    # metadata.jsonl is never created.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=2, T=40, seed=1), root, "acme/a")
+    cfg = CensusConfig(out_dir=tmp_path, tier="deep", files_per_dataset=1)
+    n = run_census(["acme/a"], LocalSource(root), cfg, out_dir=tmp_path)
+    assert n == 1
+    meta_path = tmp_path / "metadata.jsonl"
+    deep_path = tmp_path / "deep.jsonl"
+    assert deep_path.exists()
+    rows = [json.loads(l) for l in deep_path.read_text().strip().splitlines()]
+    assert [r["repo"] for r in rows] == ["acme/a"]
+    assert not meta_path.exists()
+
+
+def test_run_census_both_runs_both_tiers(tmp_path):
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=2, T=40, seed=1), root, "acme/a")
+    cfg = CensusConfig(out_dir=tmp_path, tier="both", files_per_dataset=1)
+    n = run_census(["acme/a"], LocalSource(root), cfg, out_dir=tmp_path)
+    assert n == 2
+    meta_path = tmp_path / "metadata.jsonl"
+    deep_path = tmp_path / "deep.jsonl"
+    assert meta_path.exists()
+    assert deep_path.exists()
+    assert len(meta_path.read_text().strip().splitlines()) == 1
+    assert len(deep_path.read_text().strip().splitlines()) == 1
+
+
+def test_run_census_rejects_an_invalid_tier(tmp_path):
+    # A programmatic caller who mistypes cfg.tier must get a clear
+    # error naming the bad value, not a silent no-op that runs nothing.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    cfg = CensusConfig(out_dir=tmp_path, tier="deep-only-ish")
+    with pytest.raises(ValueError, match="deep-only-ish"):
+        run_census(["acme/a"], LocalSource(root), cfg, out_dir=tmp_path)
 
 
 class _FakeClient:

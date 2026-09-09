@@ -55,8 +55,8 @@ from pathlib import Path
 import numpy as np
 
 from ledger.census import (
-    CensusConfig, build_frame, draw_sample, load_done,
-    run_deep_tier, run_metadata_tier,
+    CensusConfig, build_frame, draw_sample,
+    run_census as run_census_tiers,
 )
 from ledger.hubclient import HubClient
 from ledger.report import DatasetReport, audit_frame, summarise, write_csv
@@ -229,22 +229,13 @@ def run_census(args) -> int:
         frame = build_frame(client)
 
     sample = draw_sample(frame, args.sample_size, args.seed)
+    # tier lives only on cfg from here on: which tiers actually run is
+    # decided by ledger.census.run_census reading cfg.tier, not by this
+    # function branching on args.census itself.
     cfg = CensusConfig(out_dir=out_dir, sample_size=args.sample_size, seed=args.seed,
                        files_per_dataset=args.files, tier=args.census)
 
-    written = 0
-    if args.census in ("metadata", "both"):
-        meta_path = out_dir / "metadata.jsonl"
-        done = load_done(meta_path) if args.resume else set()
-        n = run_metadata_tier(sample, source, meta_path, done=done)
-        written += n
-        print(f"metadata tier: {n} record(s) -> {meta_path}", file=sys.stderr)
-    if args.census in ("deep", "both"):
-        deep_path = out_dir / "deep.jsonl"
-        done = load_done(deep_path) if args.resume else set()
-        n = run_deep_tier(sample, source, cfg, deep_path, done=done)
-        written += n
-        print(f"deep tier: {n} record(s) -> {deep_path}", file=sys.stderr)
+    written = run_census_tiers(sample, source, cfg, out_dir=out_dir, resume=args.resume)
 
     print(f"census: {written} record(s) written under {out_dir}")
     return 0

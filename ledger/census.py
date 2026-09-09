@@ -42,6 +42,7 @@ judgement recorded on DatasetReport.confirmed, per ledger.report.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -214,6 +215,56 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
         append_jsonl(rep, out_path)
         n += 1
     return n
+
+
+TIERS = ("metadata", "deep", "both")
+
+
+def run_census(repos: list[str], source, cfg: CensusConfig, out_dir=None,
+               resume: bool = False) -> int:
+    """Single entry point for the two tier census: cfg.tier is the only
+    switch that decides which tiers run.
+
+    This exists so the tier decision lives in one place. Before this,
+    ledger.audit built a CensusConfig with a tier field on it and then
+    separately branched on args.census to decide what to run; a caller
+    building a CensusConfig directly, tier and all, still got both
+    tiers regardless of what tier said, since nothing ever read it.
+    run_census is what audit.py now delegates to, so args.census
+    reaches run_metadata_tier / run_deep_tier only by way of cfg.tier,
+    and any other caller gets the same guarantee.
+
+    Runs run_metadata_tier when cfg.tier is "metadata" or "both", and
+    run_deep_tier when it is "deep" or "both", writing to
+    <out_dir>/metadata.jsonl and <out_dir>/deep.jsonl, the same paths
+    the CLI has always written. Both tiers are the unchanged building
+    blocks; this function only decides which of them to call. out_dir
+    defaults to cfg.out_dir. resume mirrors the CLI's --resume flag:
+    when true, each tier that runs loads its own existing output file
+    with load_done() first and skips repos already recorded there.
+
+    Raises ValueError, naming the bad value, if cfg.tier is not one of
+    "metadata", "deep" or "both", rather than silently running nothing.
+    """
+    if cfg.tier not in TIERS:
+        raise ValueError(
+            f"unknown census tier {cfg.tier!r}, expected one of {TIERS}"
+        )
+    out_dir = Path(out_dir) if out_dir is not None else Path(cfg.out_dir)
+    written = 0
+    if cfg.tier in ("metadata", "both"):
+        meta_path = out_dir / "metadata.jsonl"
+        done = load_done(meta_path) if resume else set()
+        n = run_metadata_tier(repos, source, meta_path, done=done)
+        written += n
+        print(f"metadata tier: {n} record(s) -> {meta_path}", file=sys.stderr)
+    if cfg.tier in ("deep", "both"):
+        deep_path = out_dir / "deep.jsonl"
+        done = load_done(deep_path) if resume else set()
+        n = run_deep_tier(repos, source, cfg, deep_path, done=done)
+        written += n
+        print(f"deep tier: {n} record(s) -> {deep_path}", file=sys.stderr)
+    return written
 
 
 def prevalence(reports: list[DatasetReport], flag: str) -> tuple[float, float, float]:
