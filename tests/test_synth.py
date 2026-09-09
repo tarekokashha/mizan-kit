@@ -3,14 +3,20 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-from ledger.synth import make_episodes, DEFECTS, write_v20_fixture, write_v30_fixture
+
+from ledger.synth import DEFECTS, make_episodes, write_v20_fixture, write_v30_fixture
 
 
 def test_clean_shape_and_dtypes():
     df = make_episodes(fps=30.0, n_eps=4, T=100, n_joints=6, seed=1)
     assert len(df) == 400
-    assert set(df.columns) == {"timestamp", "frame_index", "episode_index",
-                               "action", "observation.state"}
+    assert set(df.columns) == {
+        "timestamp",
+        "frame_index",
+        "episode_index",
+        "action",
+        "observation.state",
+    }
     assert df["episode_index"].nunique() == 4
     assert len(df["action"].iloc[0]) == 6
 
@@ -18,15 +24,13 @@ def test_clean_shape_and_dtypes():
 def test_is_deterministic_under_seed():
     a = make_episodes(seed=7)
     b = make_episodes(seed=7)
-    assert np.array_equal(np.stack(a["action"].to_numpy()),
-                          np.stack(b["action"].to_numpy()))
+    assert np.array_equal(np.stack(a["action"].to_numpy()), np.stack(b["action"].to_numpy()))
 
 
 def test_different_seeds_differ():
     a = make_episodes(seed=1)
     b = make_episodes(seed=2)
-    assert not np.array_equal(np.stack(a["action"].to_numpy()),
-                              np.stack(b["action"].to_numpy()))
+    assert not np.array_equal(np.stack(a["action"].to_numpy()), np.stack(b["action"].to_numpy()))
 
 
 @pytest.mark.parametrize("defect", DEFECTS)
@@ -37,8 +41,7 @@ def test_every_defect_generates(defect):
 
 def test_duplicate_defect_reuses_episode_zero_action():
     df = make_episodes(defect="duplicate", seed=0, n_eps=3, T=50)
-    by_episode = {ep: np.stack(sub["action"].to_numpy())
-                  for ep, sub in df.groupby("episode_index")}
+    by_episode = {ep: np.stack(sub["action"].to_numpy()) for ep, sub in df.groupby("episode_index")}
     for ep in range(1, 3):
         assert np.array_equal(by_episode[ep], by_episode[0])
 

@@ -1,7 +1,11 @@
 import pytest
+
 from ledger.sources import (
-    LocalSource, SyntheticSource, StreamingSource, DownloadSource,
     AUDIT_COLUMNS,
+    DownloadSource,
+    LocalSource,
+    StreamingSource,
+    SyntheticSource,
 )
 from ledger.synth import make_episodes, write_v20_fixture, write_v30_fixture
 
@@ -57,7 +61,6 @@ def test_synthetic_source_is_offline():
 
 
 def test_projection_drops_non_audit_columns(tmp_path):
-    import pandas as pd
     df = make_episodes(n_eps=1, T=20, seed=2)
     df["observation.images.top"] = [b"x" * 1024] * len(df)
     p = tmp_path / "acme/v30/data/chunk-000/file-000.parquet"
@@ -66,7 +69,8 @@ def test_projection_drops_non_audit_columns(tmp_path):
     (tmp_path / "acme/v30/meta").mkdir(parents=True, exist_ok=True)
     (tmp_path / "acme/v30/meta/info.json").write_text(
         '{"codebase_version":"v3.0","fps":30,"chunks_size":1000,"total_episodes":1,'
-        '"data_path":"data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}')
+        '"data_path":"data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}'
+    )
     out = LocalSource(tmp_path).frames("acme/v30", "data/chunk-000/file-000.parquet")
     assert "observation.images.top" not in out.columns
 
@@ -111,6 +115,7 @@ class _FakeHubResp:
 
     def __init__(self, body, headers=None):
         import json as _json
+
         self._b = _json.dumps(body).encode()
         self.headers = headers or {}
 
@@ -128,8 +133,13 @@ def test_streaming_source_reports_the_revision_captured_by_info(monkeypatch):
     from ledger.hubclient import HubClient
 
     client = HubClient(min_interval=0.0)
-    monkeypatch.setattr(client, "_open", lambda req, timeout=None: _FakeHubResp(
-        {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "abc123"}))
+    monkeypatch.setattr(
+        client,
+        "_open",
+        lambda req, timeout=None: _FakeHubResp(
+            {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "abc123"}
+        ),
+    )
     s = StreamingSource(client=client)
     s.info("acme/x")
     assert s.revision("acme/x") == "abc123"
@@ -139,8 +149,13 @@ def test_download_source_reports_the_revision_captured_by_info(monkeypatch):
     from ledger.hubclient import HubClient
 
     client = HubClient(min_interval=0.0)
-    monkeypatch.setattr(client, "_open", lambda req, timeout=None: _FakeHubResp(
-        {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "def456"}))
+    monkeypatch.setattr(
+        client,
+        "_open",
+        lambda req, timeout=None: _FakeHubResp(
+            {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "def456"}
+        ),
+    )
     s = DownloadSource(client=client)
     s.info("acme/y")
     assert s.revision("acme/y") == "def456"
@@ -180,26 +195,41 @@ def test_streaming_source_parquet_paths_discovers_every_packed_file_under_limit_
     # End to end: parquet_paths(limit=None) on a packed dataset must
     # probe via the source's own exists() rather than silently sampling
     # one file.
-    info = {"codebase_version": "v3.0", "fps": 30, "chunks_size": 1000,
-            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
-    present = {"data/chunk-000/file-000.parquet", "data/chunk-000/file-001.parquet",
-              "data/chunk-000/file-002.parquet"}
+    info = {
+        "codebase_version": "v3.0",
+        "fps": 30,
+        "chunks_size": 1000,
+        "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+    }
+    present = {
+        "data/chunk-000/file-000.parquet",
+        "data/chunk-000/file-001.parquet",
+        "data/chunk-000/file-002.parquet",
+    }
     s = StreamingSource()
-    monkeypatch.setattr(s._fs, "exists",
-                        lambda path: path.removeprefix("datasets/acme/x/") in present)
+    monkeypatch.setattr(
+        s._fs, "exists", lambda path: path.removeprefix("datasets/acme/x/") in present
+    )
     paths = s.parquet_paths("acme/x", info, limit=None)
-    assert paths == ["data/chunk-000/file-000.parquet",
-                     "data/chunk-000/file-001.parquet",
-                     "data/chunk-000/file-002.parquet"]
+    assert paths == [
+        "data/chunk-000/file-000.parquet",
+        "data/chunk-000/file-001.parquet",
+        "data/chunk-000/file-002.parquet",
+    ]
 
 
 def test_download_source_parquet_paths_discovers_every_packed_file_under_limit_none(monkeypatch):
-    info = {"codebase_version": "v3.0", "fps": 30, "chunks_size": 1000,
-            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+    info = {
+        "codebase_version": "v3.0",
+        "fps": 30,
+        "chunks_size": 1000,
+        "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+    }
     present = {"data/chunk-000/file-000.parquet"}
     s = DownloadSource()
-    monkeypatch.setattr(s._fs, "exists",
-                        lambda path: path.removeprefix("datasets/acme/x/") in present)
+    monkeypatch.setattr(
+        s._fs, "exists", lambda path: path.removeprefix("datasets/acme/x/") in present
+    )
     paths = s.parquet_paths("acme/x", info, limit=None)
     assert paths == ["data/chunk-000/file-000.parquet"]
 

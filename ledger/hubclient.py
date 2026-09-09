@@ -4,6 +4,7 @@ Measured on 2026-09-05: anonymous requests hit HTTP 429 with
 "maximum queue size reached" within tens of requests, on both the api
 and resolve hosts. A census therefore needs a token and needs to behave.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,7 @@ import random
 import time
 import urllib.error
 import urllib.request
-from typing import Iterator
+from collections.abc import Iterator
 
 API = "https://huggingface.co/api"
 RESOLVE = "https://huggingface.co/datasets/{repo}/resolve/main/meta/info.json"
@@ -48,6 +49,7 @@ def _discover_token() -> str | None:
         return tok.strip()
     try:
         from huggingface_hub import get_token
+
         return get_token()
     except Exception:
         return None
@@ -73,9 +75,14 @@ def _extract_revision(response) -> str:
 
 
 class HubClient:
-    def __init__(self, min_interval: float = 0.2, max_retries: int = 5,
-                 timeout: float = 45.0, token: str | None = None,
-                 user_agent: str = "mizan-ledger/0.1"):
+    def __init__(
+        self,
+        min_interval: float = 0.2,
+        max_retries: int = 5,
+        timeout: float = 45.0,
+        token: str | None = None,
+        user_agent: str = "mizan-ledger/0.1",
+    ):
         self.min_interval = min_interval
         self.max_retries = max_retries
         self.timeout = timeout
@@ -125,13 +132,13 @@ class HubClient:
                 last = e
                 if e.code in (429, 500, 502, 503, 504):
                     ra = e.headers.get("Retry-After") if e.headers else None
-                    wait = float(ra) if ra and str(ra).isdigit() else 2 ** attempt
+                    wait = float(ra) if ra and str(ra).isdigit() else 2**attempt
                     time.sleep(wait + random.uniform(0, 0.4))
                     continue
                 raise
             except (urllib.error.URLError, TimeoutError) as e:
                 last = e
-                time.sleep(2 ** attempt + random.uniform(0, 0.4))
+                time.sleep(2**attempt + random.uniform(0, 0.4))
         raise RateLimited(f"gave up on {url} after {self.max_retries} attempts: {last}")
 
     def get_json(self, url: str):
@@ -172,8 +179,9 @@ class HubClient:
         """
         return self._revisions.get(repo, "")
 
-    def iter_datasets(self, filter_tag: str = "LeRobot", page_size: int = 1000,
-                      max_pages: int | None = None) -> Iterator[dict]:
+    def iter_datasets(
+        self, filter_tag: str = "LeRobot", page_size: int = 1000, max_pages: int | None = None
+    ) -> Iterator[dict]:
         url = f"{API}/datasets?filter={filter_tag}&limit={page_size}"
         pages = 0
         while url and (max_pages is None or pages < max_pages):

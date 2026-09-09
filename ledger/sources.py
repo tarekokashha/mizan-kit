@@ -14,8 +14,10 @@ parquet_paths). SyntheticSource has no real files to check, so it has
 none; ledger.paths.packed_sample_is_partial is how a caller notices
 that and records the resulting sample as partial rather than complete.
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Protocol
@@ -23,12 +25,11 @@ from typing import Protocol
 import pandas as pd
 import pyarrow.parquet as pq
 
+from . import synth
 from .hubclient import HubClient
 from .paths import derive_paths
-from . import synth
 
-AUDIT_COLUMNS = ("timestamp", "frame_index", "episode_index",
-                 "action", "observation.state")
+AUDIT_COLUMNS = ("timestamp", "frame_index", "episode_index", "action", "observation.state")
 
 
 def read_projected(handle) -> pd.DataFrame:
@@ -58,8 +59,10 @@ class LocalSource:
         return (self.root / repo / path).exists()
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
-        found = sorted(str(p.relative_to(self.root / repo).as_posix())
-                       for p in (self.root / repo).glob("data/**/*.parquet"))
+        found = sorted(
+            str(p.relative_to(self.root / repo).as_posix())
+            for p in (self.root / repo).glob("data/**/*.parquet")
+        )
         return found[:limit] if limit else found
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
@@ -73,9 +76,13 @@ class SyntheticSource:
         self.defect, self.fps, self.kw = defect, fps, kw
 
     def info(self, repo: str) -> dict:
-        return {"codebase_version": "demo", "fps": self.fps, "chunks_size": 1000,
-                "total_episodes": self.kw.get("n_eps", 6),
-                "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+        return {
+            "codebase_version": "demo",
+            "fps": self.fps,
+            "chunks_size": 1000,
+            "total_episodes": self.kw.get("n_eps", 6),
+            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+        }
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
         return ["synthetic://0"]
@@ -90,6 +97,7 @@ class StreamingSource:
     def __init__(self, client: HubClient | None = None):
         self.client = client or HubClient()
         from huggingface_hub import HfFileSystem
+
         self._fs = HfFileSystem()
 
     def info(self, repo: str) -> dict | None:
@@ -129,6 +137,7 @@ class DownloadSource:
         self.client = client or HubClient()
         self.keep = keep
         from huggingface_hub import HfFileSystem
+
         self._fs = HfFileSystem()
 
     def info(self, repo: str) -> dict | None:
@@ -149,12 +158,13 @@ class DownloadSource:
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
         from huggingface_hub import hf_hub_download
+
         local = hf_hub_download(repo, path, repo_type="dataset")
         try:
             return read_projected(local)
         finally:
             if not self.keep:
-                try:
+                # Best effort. A file we cannot delete is a disk hygiene issue,
+                # never a reason to fail an audit that already succeeded.
+                with contextlib.suppress(OSError):
                     Path(local).unlink()
-                except OSError:
-                    pass

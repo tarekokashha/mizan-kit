@@ -39,6 +39,7 @@ than raised, so one bad dataset can never end the run. Neither tier
 ever labels a dataset as having a confirmed problem; that stays a human
 judgement recorded on DatasetReport.confirmed, per ledger.report.
 """
+
 from __future__ import annotations
 
 import json
@@ -130,7 +131,7 @@ def load_done(path) -> set[str]:
     done: set[str] = set()
     if not path.exists():
         return done
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -216,8 +217,9 @@ def run_metadata_tier(repos: list[str], source, out_path, done: set[str] | None 
     return n
 
 
-def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
-                  done: set[str] | None = None) -> int:
+def run_deep_tier(
+    repos: list[str], source, cfg: CensusConfig, out_path, done: set[str] | None = None
+) -> int:
     """Full tier: sample parquet data for each repo and run the audit.
 
     Every dataset is wrapped in its own try block. A missing repo, an
@@ -265,10 +267,13 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
             rep.source = type(source).__name__
             has_exists = callable(getattr(source, "exists", None))
             if packed_sample_is_partial(info, cfg.files_per_dataset, has_exists):
-                rep.note = "partial: packed layout, source has no existence check, sampled 1 file only"
+                rep.note = (
+                    "partial: packed layout, source has no existence check, sampled 1 file only"
+                )
         except Exception as e:  # noqa: BLE001 - graceful degradation is the point
-            rep = DatasetReport(repo=repo, source=type(source).__name__,
-                                error=f"{type(e).__name__}: {e}")
+            rep = DatasetReport(
+                repo=repo, source=type(source).__name__, error=f"{type(e).__name__}: {e}"
+            )
         if get_revision:
             rep.revision = get_revision(repo)
         append_jsonl(rep, out_path)
@@ -279,8 +284,9 @@ def run_deep_tier(repos: list[str], source, cfg: CensusConfig, out_path,
 TIERS = ("metadata", "deep", "both")
 
 
-def run_census(repos: list[str], source, cfg: CensusConfig, out_dir=None,
-               resume: bool = False) -> int:
+def run_census(
+    repos: list[str], source, cfg: CensusConfig, out_dir=None, resume: bool = False
+) -> int:
     """Single entry point for the two tier census: cfg.tier is the only
     switch that decides which tiers run.
 
@@ -306,9 +312,7 @@ def run_census(repos: list[str], source, cfg: CensusConfig, out_dir=None,
     "metadata", "deep" or "both", rather than silently running nothing.
     """
     if cfg.tier not in TIERS:
-        raise ValueError(
-            f"unknown census tier {cfg.tier!r}, expected one of {TIERS}"
-        )
+        raise ValueError(f"unknown census tier {cfg.tier!r}, expected one of {TIERS}")
     out_dir = Path(out_dir) if out_dir is not None else Path(cfg.out_dir)
     written = 0
     if cfg.tier in ("metadata", "both"):

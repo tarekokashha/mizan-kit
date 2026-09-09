@@ -1,14 +1,24 @@
 import json
+
 import pytest
+
 from ledger.hubclient import HubClient, RateLimited, _next_link
 
 
 class FakeResp:
     def __init__(self, body, headers=None, status=200):
-        self._b = json.dumps(body).encode(); self.headers = headers or {}; self.status = status
-    def read(self): return self._b
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
+        self._b = json.dumps(body).encode()
+        self.headers = headers or {}
+        self.status = status
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
 def test_retries_then_succeeds(monkeypatch):
@@ -130,9 +140,10 @@ def test_pagination_requests_the_next_url_not_a_different_relation(monkeypatch):
     def opener(req, timeout=None):
         requested.append(req.full_url)
         if len(requested) == 1:
-            return FakeResp([{"id": "a"}],
-                            {"Link": '<https://example/prev>; rel="prev", '
-                                     '<https://example/p2>; rel="next"'})
+            return FakeResp(
+                [{"id": "a"}],
+                {"Link": '<https://example/prev>; rel="prev", <https://example/p2>; rel="next"'},
+            )
         return FakeResp([{"id": "b"}], {})
 
     c = HubClient(min_interval=0.0)
@@ -209,8 +220,9 @@ def test_get_revision_does_not_change_get_info_return_contract(monkeypatch):
     # Capturing the header must be invisible to get_info's own contract:
     # a successful call still returns the parsed info dict, unchanged.
     def opener(req, timeout=None):
-        return FakeResp({"codebase_version": "v3.0", "fps": 30},
-                        headers={"X-Repo-Commit": "abc123"})
+        return FakeResp(
+            {"codebase_version": "v3.0", "fps": 30}, headers={"X-Repo-Commit": "abc123"}
+        )
 
     c = HubClient(min_interval=0.0)
     monkeypatch.setattr(c, "_open", opener)

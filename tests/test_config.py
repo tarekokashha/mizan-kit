@@ -1,5 +1,6 @@
 import pytest
-from ledger.config import load_thresholds, DEFAULT_THRESHOLDS
+
+from ledger.config import load_thresholds
 
 
 def test_defaults_match_v0_values():
@@ -13,8 +14,10 @@ def test_defaults_match_v0_values():
 
 def test_rejects_out_of_range_fraction(tmp_path):
     p = tmp_path / "bad.toml"
-    p.write_text("[thresholds]\nfrac_bad_dt = 1.5\nstuck_state_frac = 0.2\n"
-                 "identity_frac = 0.5\nlag_large = 3\ndup_episode_frac = 0.0\n")
+    p.write_text(
+        "[thresholds]\nfrac_bad_dt = 1.5\nstuck_state_frac = 0.2\n"
+        "identity_frac = 0.5\nlag_large = 3\ndup_episode_frac = 0.0\n"
+    )
     with pytest.raises(ValueError, match="frac_bad_dt"):
         load_thresholds(p)
 

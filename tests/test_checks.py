@@ -1,9 +1,15 @@
 import numpy as np
 import pandas as pd
-import pytest
+
 from ledger.checks import (
-    REGISTRY, AGGREGATE_FLAGS, EpisodeStats, run_checks, episode_stats,
-    xcorr_lag, ts_nonmonotonic, frame_gap,
+    AGGREGATE_FLAGS,
+    REGISTRY,
+    EpisodeStats,
+    episode_stats,
+    frame_gap,
+    run_checks,
+    ts_nonmonotonic,
+    xcorr_lag,
 )
 from ledger.synth import make_episodes
 
@@ -15,8 +21,13 @@ def _stats(defect="", **kw):
 
 
 def test_registry_is_populated():
-    assert {"frac_bad_dt", "stuck_state_frac", "identity_frac",
-            "ts_nonmonotonic", "frame_gap"} <= set(REGISTRY)
+    assert {
+        "frac_bad_dt",
+        "stuck_state_frac",
+        "identity_frac",
+        "ts_nonmonotonic",
+        "frame_gap",
+    } <= set(REGISTRY)
     assert "dup_episode_frac" not in REGISTRY
 
 
@@ -50,32 +61,57 @@ def test_xcorr_recovers_positive_lag():
 
 
 def test_xcorr_returns_nan_for_short_series():
-    a = np.zeros((5, 6)); s = np.zeros((5, 6))
+    a = np.zeros((5, 6))
+    s = np.zeros((5, 6))
     best, r0, rb = xcorr_lag(a, s, range(-5, 11))
     assert np.isnan(r0) and np.isnan(rb)
 
 
 def test_ts_nonmonotonic_flags_non_increasing_timestamp():
-    s = EpisodeStats(n_frames=4, fps=30.0, ts=np.array([0.0, 0.033, 0.033, 0.1]),
-                     frame_index=np.arange(4), action=None, state=None)
+    s = EpisodeStats(
+        n_frames=4,
+        fps=30.0,
+        ts=np.array([0.0, 0.033, 0.033, 0.1]),
+        frame_index=np.arange(4),
+        action=None,
+        state=None,
+    )
     assert ts_nonmonotonic(s) == 1.0
 
 
 def test_ts_nonmonotonic_is_quiet_on_increasing_timestamp():
-    s = EpisodeStats(n_frames=4, fps=30.0, ts=np.array([0.0, 0.033, 0.066, 0.1]),
-                     frame_index=np.arange(4), action=None, state=None)
+    s = EpisodeStats(
+        n_frames=4,
+        fps=30.0,
+        ts=np.array([0.0, 0.033, 0.066, 0.1]),
+        frame_index=np.arange(4),
+        action=None,
+        state=None,
+    )
     assert ts_nonmonotonic(s) == 0.0
 
 
 def test_frame_gap_flags_missing_frame():
-    s = EpisodeStats(n_frames=3, fps=30.0, ts=np.array([0.0, 0.033, 0.066]),
-                     frame_index=np.array([0, 1, 3]), action=None, state=None)
+    s = EpisodeStats(
+        n_frames=3,
+        fps=30.0,
+        ts=np.array([0.0, 0.033, 0.066]),
+        frame_index=np.array([0, 1, 3]),
+        action=None,
+        state=None,
+    )
     assert frame_gap(s) == 1.0
 
 
 def test_frame_gap_is_quiet_on_consecutive_frames():
-    s = EpisodeStats(n_frames=3, fps=30.0, ts=np.array([0.0, 0.033, 0.066]),
-                     frame_index=np.array([0, 1, 2]), action=None, state=None)
+    s = EpisodeStats(
+        n_frames=3,
+        fps=30.0,
+        ts=np.array([0.0, 0.033, 0.066]),
+        frame_index=np.array([0, 1, 2]),
+        action=None,
+        state=None,
+    )
     assert frame_gap(s) == 0.0
 
 
@@ -85,22 +121,26 @@ def test_frame_gap_is_quiet_on_consecutive_frames():
 # to the same "no data" None every downstream check already treats as nan.
 # --------------------------------------------------------------------------- #
 def test_episode_stats_records_a_stack_error_for_a_ragged_action_column():
-    ep = pd.DataFrame({
-        "timestamp": [0.0, 0.033, 0.066],
-        "frame_index": [0, 1, 2],
-        "action": [[0.0, 1.0], [0.0, 1.0, 2.0], [0.0]],  # ragged: differing lengths
-        "observation.state": [[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]],
-    })
+    ep = pd.DataFrame(
+        {
+            "timestamp": [0.0, 0.033, 0.066],
+            "frame_index": [0, 1, 2],
+            "action": [[0.0, 1.0], [0.0, 1.0, 2.0], [0.0]],  # ragged: differing lengths
+            "observation.state": [[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]],
+        }
+    )
     stats = episode_stats(ep, fps=30.0)
     assert stats.action is None
     assert stats.stack_error is True
 
 
 def test_episode_stats_has_no_stack_error_when_the_column_is_simply_absent():
-    ep = pd.DataFrame({
-        "timestamp": [0.0, 0.033, 0.066],
-        "frame_index": [0, 1, 2],
-    })
+    ep = pd.DataFrame(
+        {
+            "timestamp": [0.0, 0.033, 0.066],
+            "frame_index": [0, 1, 2],
+        }
+    )
     stats = episode_stats(ep, fps=30.0)
     assert stats.action is None
     assert stats.state is None
@@ -108,12 +148,14 @@ def test_episode_stats_has_no_stack_error_when_the_column_is_simply_absent():
 
 
 def test_episode_stats_has_no_stack_error_on_a_clean_episode():
-    ep = pd.DataFrame({
-        "timestamp": [0.0, 0.033, 0.066],
-        "frame_index": [0, 1, 2],
-        "action": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
-        "observation.state": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
-    })
+    ep = pd.DataFrame(
+        {
+            "timestamp": [0.0, 0.033, 0.066],
+            "frame_index": [0, 1, 2],
+            "action": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
+            "observation.state": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
+        }
+    )
     stats = episode_stats(ep, fps=30.0)
     assert stats.action is not None
     assert stats.stack_error is False

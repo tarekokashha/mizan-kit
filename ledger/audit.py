@@ -55,6 +55,7 @@ frame_gap_eps) and the flags they can raise. Flags are provisional
 measurements, never a finding a dataset is "defective"; see
 ledger.report.PROVISIONAL_HEADER.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -67,7 +68,11 @@ from pathlib import Path
 import numpy as np
 
 from ledger.census import (
-    CensusConfig, build_frame, draw_sample,
+    CensusConfig,
+    build_frame,
+    draw_sample,
+)
+from ledger.census import (
     run_census as run_census_tiers,
 )
 from ledger.hubclient import HubClient
@@ -86,7 +91,9 @@ __all__ = ["main", "parse_files", "demo", "_synthetic", "audit_frame", "summaris
 # rate limit punishes hardest. All optional so --demo runs offline.
 # --------------------------------------------------------------------------- #
 def list_top(n: int) -> list[str]:
-    url = f"https://huggingface.co/api/datasets?filter=LeRobot&sort=downloads&direction=-1&limit={n}"
+    url = (
+        f"https://huggingface.co/api/datasets?filter=LeRobot&sort=downloads&direction=-1&limit={n}"
+    )
     with urllib.request.urlopen(url, timeout=60) as r:
         return [d["id"] for d in json.load(r)]
 
@@ -118,7 +125,10 @@ def sample_parquet_paths(repo: str, max_files: int | None, max_mb: float) -> lis
     files.sort()  # chunk-000/file-000 (v3) or chunk-000/episode_000000 (v2.x) first
     small = [p for p, s in files if s <= max_mb * 1e6]
     if not small:
-        print(f"  [skip] {repo}: smallest parquet exceeds --max-mb {max_mb:.0f}; raise it or run in the overnight loop", file=sys.stderr)
+        print(
+            f"  [skip] {repo}: smallest parquet exceeds --max-mb {max_mb:.0f}; raise it or run in the overnight loop",
+            file=sys.stderr,
+        )
         return []
     return small[:max_files]
 
@@ -161,7 +171,9 @@ def audit_repo(repo: str, max_files: int | None, max_mb: float) -> DatasetReport
 # tests/test_audit.py, which imports it by name, keeps testing the
 # actual thing v0 shipped rather than a reimplementation of it.
 # --------------------------------------------------------------------------- #
-def _synthetic(fps: float = 30.0, n_eps: int = 6, T: int = 300, lag: int = 2, defect: str = "") -> "pandas.DataFrame":
+def _synthetic(
+    fps: float = 30.0, n_eps: int = 6, T: int = 300, lag: int = 2, defect: str = ""
+) -> pandas.DataFrame:  # noqa: F821
     import pandas as pd
 
     rng = np.random.default_rng(0)
@@ -170,24 +182,42 @@ def _synthetic(fps: float = 30.0, n_eps: int = 6, T: int = 300, lag: int = 2, de
         t = np.arange(T) / fps
         # smooth random joint trajectory as the commanded action
         base = np.cumsum(rng.normal(0, 0.02, size=(T + lag + 5, 6)), axis=0)
-        action = base[lag: T + lag]                                      # command at t
-        state = base[: T] + rng.normal(0, 1e-3, size=(T, 6))            # reaches it `lag` frames later
+        action = base[lag : T + lag]  # command at t
+        state = base[:T] + rng.normal(0, 1e-3, size=(T, 6))  # reaches it `lag` frames later
         if defect == "identity":
             action = state.copy()
         if defect == "drops" and e % 2 == 0:
-            keep = np.ones(T, bool); keep[rng.choice(T, size=T // 8, replace=False)] = False
+            keep = np.ones(T, bool)
+            keep[rng.choice(T, size=T // 8, replace=False)] = False
             t, action, state = t[keep], action[keep], state[keep]
         if defect == "stuck" and e % 2 == 0:
             state[50:200] = state[50]
         if defect == "swapped":
             action, state = state, action
+        # The next two lines carry two defects that v0 shipped and that are
+        # preserved on purpose, because tests/test_audit.py imports this
+        # function by name to test what v0 actually did. rows_first_action is
+        # referenced before any binding a reader can see, and the annotation
+        # above names pandas before it is imported. Neither fires: e == 0 is
+        # always the first iteration, so the name is bound before any e > 0
+        # reads it, and the annotation is a string under
+        # from __future__ import annotations. Fixing them here would make this
+        # copy diverge from the v0 it exists to preserve. The corrected
+        # generator is ledger/synth.py.
         if defect == "duplicate" and e > 0:
-            action = rows_first_action
+            action = rows_first_action  # noqa: F821
         if e == 0:
-            rows_first_action = action
+            rows_first_action = action  # noqa: F841
         for i in range(len(t)):
-            rows.append(dict(timestamp=np.float32(t[i]), frame_index=i, episode_index=e,
-                             action=action[i].astype(np.float32), **{"observation.state": state[i].astype(np.float32)}))
+            rows.append(
+                dict(
+                    timestamp=np.float32(t[i]),
+                    frame_index=i,
+                    episode_index=e,
+                    action=action[i].astype(np.float32),
+                    **{"observation.state": state[i].astype(np.float32)},
+                )
+            )
     return pd.DataFrame(rows)
 
 
@@ -203,7 +233,11 @@ def demo(out: str | None = None) -> list[DatasetReport]:
     rows = []
     for defect in ["", "identity", "drops", "stuck", "swapped", "duplicate"]:
         df = _synthetic(defect=defect)
-        rep = summarise(f"synthetic/{defect or 'clean'}", {"codebase_version": "demo", "fps": 30}, [audit_frame(df, 30.0)])
+        rep = summarise(
+            f"synthetic/{defect or 'clean'}",
+            {"codebase_version": "demo", "fps": 30},
+            [audit_frame(df, 30.0)],
+        )
         rows.append(rep)
     _print_table(rows)
     if out:
@@ -233,8 +267,10 @@ def run_census(args) -> int:
     if args.repos:
         frame = [r for r in args.repos.split(",") if r]
     elif args.source == "local":
-        print("error: --source local requires --repos (there is no Hub to crawl for a frame)",
-              file=sys.stderr)
+        print(
+            "error: --source local requires --repos (there is no Hub to crawl for a frame)",
+            file=sys.stderr,
+        )
         return 2
     else:
         client = getattr(source, "client", None) or HubClient()
@@ -244,8 +280,13 @@ def run_census(args) -> int:
     # tier lives only on cfg from here on: which tiers actually run is
     # decided by ledger.census.run_census reading cfg.tier, not by this
     # function branching on args.census itself.
-    cfg = CensusConfig(out_dir=out_dir, sample_size=args.sample_size, seed=args.seed,
-                       files_per_dataset=args.files, tier=args.census)
+    cfg = CensusConfig(
+        out_dir=out_dir,
+        sample_size=args.sample_size,
+        seed=args.seed,
+        files_per_dataset=args.files,
+        tier=args.census,
+    )
 
     written = run_census_tiers(sample, source, cfg, out_dir=out_dir, resume=args.resume)
 
@@ -257,8 +298,20 @@ def run_census(args) -> int:
 # CLI
 # --------------------------------------------------------------------------- #
 def _print_table(reps: list[DatasetReport]) -> None:
-    cols = ["repo", "codebase", "fps", "episodes_sampled", "frac_bad_dt", "stuck_state_frac",
-            "identity_frac", "lag_frames", "r_lag0", "r_best", "dup_episode_frac", "flags"]
+    cols = [
+        "repo",
+        "codebase",
+        "fps",
+        "episodes_sampled",
+        "frac_bad_dt",
+        "stuck_state_frac",
+        "identity_frac",
+        "lag_frames",
+        "r_lag0",
+        "r_best",
+        "dup_episode_frac",
+        "flags",
+    ]
     widths = {c: max(len(c), *(len(_fmt(getattr(r, c))) for r in reps)) for c in cols}
     print("  ".join(c.ljust(widths[c]) for c in cols))
     for r in reps:
@@ -283,36 +336,78 @@ def parse_files(value: str) -> int | None:
     try:
         return int(value)
     except ValueError as e:
-        raise argparse.ArgumentTypeError(f"--files must be an integer or 'all', got {value!r}") from e
+        raise argparse.ArgumentTypeError(
+            f"--files must be an integer or 'all', got {value!r}"
+        ) from e
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--top", type=int, default=0, help="audit the N most-downloaded LeRobot datasets")
-    ap.add_argument("--repos", type=str, default="",
-                    help="comma-separated repo ids; the quick audit's target list, or the census frame when given")
-    ap.add_argument("--files", type=parse_files, default=1,
-                    help="parquet files to sample per dataset; an integer, or 'all' for every file. "
-                         "In the census workflow, 'all' is exact for a per-episode (v2.x) layout "
-                         "but for a packed (v3.x) layout it probes file indices via the source's "
-                         "existence check and stops at the first missing one, falling back to one "
-                         "file (noted as partial on the report) if the source cannot check")
-    ap.add_argument("--max-mb", type=float, default=150.0, help="prefer parquet files under this size (quick workflow only)")
-    ap.add_argument("--out", type=str, default=None,
-                    help="CSV path for the quick workflow (default ledger_report.csv); "
-                         "with --demo, only written if this is given")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--top", type=int, default=0, help="audit the N most-downloaded LeRobot datasets"
+    )
+    ap.add_argument(
+        "--repos",
+        type=str,
+        default="",
+        help="comma-separated repo ids; the quick audit's target list, or the census frame when given",
+    )
+    ap.add_argument(
+        "--files",
+        type=parse_files,
+        default=1,
+        help="parquet files to sample per dataset; an integer, or 'all' for every file. "
+        "In the census workflow, 'all' is exact for a per-episode (v2.x) layout "
+        "but for a packed (v3.x) layout it probes file indices via the source's "
+        "existence check and stops at the first missing one, falling back to one "
+        "file (noted as partial on the report) if the source cannot check",
+    )
+    ap.add_argument(
+        "--max-mb",
+        type=float,
+        default=150.0,
+        help="prefer parquet files under this size (quick workflow only)",
+    )
+    ap.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="CSV path for the quick workflow (default ledger_report.csv); "
+        "with --demo, only written if this is given",
+    )
     ap.add_argument("--demo", action="store_true", help="run the offline synthetic demo")
 
     census = ap.add_argument_group("census", "the two tier Hub survey; see ledger.census")
-    census.add_argument("--census", choices=("metadata", "deep", "both"), default=None,
-                        help="run the census instead of the quick audit")
-    census.add_argument("--sample-size", type=int, default=800, help="datasets drawn from the frame")
+    census.add_argument(
+        "--census",
+        choices=("metadata", "deep", "both"),
+        default=None,
+        help="run the census instead of the quick audit",
+    )
+    census.add_argument(
+        "--sample-size", type=int, default=800, help="datasets drawn from the frame"
+    )
     census.add_argument("--seed", type=int, default=20260905, help="seed for the sample draw")
-    census.add_argument("--resume", action="store_true", help="skip repos already recorded under --out-dir")
-    census.add_argument("--out-dir", type=str, default="census_out", help="directory for metadata.jsonl / deep.jsonl")
-    census.add_argument("--source", choices=("stream", "download", "local"), default="stream",
-                        help="where the census samples parquet data from")
-    census.add_argument("--local-root", type=str, default=None, help="fixture root for --source local")
+    census.add_argument(
+        "--resume", action="store_true", help="skip repos already recorded under --out-dir"
+    )
+    census.add_argument(
+        "--out-dir",
+        type=str,
+        default="census_out",
+        help="directory for metadata.jsonl / deep.jsonl",
+    )
+    census.add_argument(
+        "--source",
+        choices=("stream", "download", "local"),
+        default="stream",
+        help="where the census samples parquet data from",
+    )
+    census.add_argument(
+        "--local-root", type=str, default=None, help="fixture root for --source local"
+    )
 
     args = ap.parse_args(argv)
 
@@ -332,7 +427,9 @@ def main(argv=None) -> int:
         t0 = time.time()
         print(f"[{i}/{len(repos)}] {repo}", file=sys.stderr)
         reps.append(audit_repo(repo, args.files, args.max_mb))
-        print(f"      done in {time.time() - t0:.1f}s  flags={reps[-1].flags or '-'}", file=sys.stderr)
+        print(
+            f"      done in {time.time() - t0:.1f}s  flags={reps[-1].flags or '-'}", file=sys.stderr
+        )
     _print_table(reps)
     out = args.out or "ledger_report.csv"
     write_csv(reps, out)

@@ -49,6 +49,7 @@ versus 0 to 2 mismatches per 6000 to 8000 trials, all near ties, at
 n_joints 6 and above). Below 6 action dimensions, treat those two flags
 as uninformative and confirm by hand rather than trusting the flag.
 """
+
 from __future__ import annotations
 
 import csv
@@ -140,9 +141,24 @@ def audit_frame(df, fps: float) -> dict:
     downstream check already reports for missing or unusable data; it
     does not change what any check computes when stacking succeeds.
     """
-    out = dict(episodes=0, frames=int(len(df)), ts_nonmono=0, bad_dt=0, n_dt=0, dts=[],
-               frame_gap=0, stuck=0, n_stuck=0, ident=0, n_ident=0, lags=[], r0=[], rb=[], hashes=[],
-               stack_errors=0)
+    out = dict(
+        episodes=0,
+        frames=int(len(df)),
+        ts_nonmono=0,
+        bad_dt=0,
+        n_dt=0,
+        dts=[],
+        frame_gap=0,
+        stuck=0,
+        n_stuck=0,
+        ident=0,
+        n_ident=0,
+        lags=[],
+        r0=[],
+        rb=[],
+        hashes=[],
+        stack_errors=0,
+    )
     if "episode_index" not in df:
         df = df.assign(episode_index=0)
     for _, ep in df.groupby("episode_index", sort=True):
@@ -163,7 +179,11 @@ def audit_frame(df, fps: float) -> dict:
             same = np.all(stats.state[1:] == stats.state[:-1], axis=1)
             out["stuck"] += int(same.sum())
             out["n_stuck"] += len(same)
-        if stats.state is not None and stats.action is not None and stats.state.shape == stats.action.shape:
+        if (
+            stats.state is not None
+            and stats.action is not None
+            and stats.state.shape == stats.action.shape
+        ):
             eq = np.all(np.isclose(stats.action, stats.state, atol=0.0), axis=1)
             out["ident"] += int(eq.sum())
             out["n_ident"] += len(eq)
@@ -178,8 +198,9 @@ def audit_frame(df, fps: float) -> dict:
     return out
 
 
-def summarise(repo: str, info: dict | None, parts: list[dict],
-             thresholds: dict | None = None) -> DatasetReport:
+def summarise(
+    repo: str, info: dict | None, parts: list[dict], thresholds: dict | None = None
+) -> DatasetReport:
     """Pool a list of audit_frame() counts dicts into one DatasetReport.
 
     Aggregation is pooled exactly as ledger.audit.summarise does: sums of
@@ -207,7 +228,11 @@ def summarise(repo: str, info: dict | None, parts: list[dict],
     rep.stack_errors = sum(p["stack_errors"] for p in parts)
     n_dt = sum(p["n_dt"] for p in parts)
     rep.frac_bad_dt = (sum(p["bad_dt"] for p in parts) / n_dt) if n_dt else float("nan")
-    dts = np.concatenate([np.asarray(p["dts"]) for p in parts if p["dts"]]) if any(p["dts"] for p in parts) else None
+    dts = (
+        np.concatenate([np.asarray(p["dts"]) for p in parts if p["dts"]])
+        if any(p["dts"] for p in parts)
+        else None
+    )
     if dts is not None and np.isfinite(rep.fps) and rep.fps > 0:
         mad = float(np.median(np.abs(dts - np.median(dts))))
         rep.dt_jitter_ratio = mad * rep.fps
@@ -277,7 +302,7 @@ def append_jsonl(report: DatasetReport, path) -> None:
 def read_jsonl(path) -> list[dict]:
     path = Path(path)
     rows = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:

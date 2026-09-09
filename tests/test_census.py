@@ -5,13 +5,20 @@ No test here touches the network. LocalSource and small hand-built
 fixtures stand in for the Hub throughout, and build_frame is exercised
 with a tiny fake client instead of ledger.hubclient.HubClient.
 """
+
 import json
 
 import pytest
 
 from ledger.census import (
-    CensusConfig, build_frame, draw_sample, load_done,
-    run_census, run_deep_tier, run_metadata_tier, prevalence,
+    CensusConfig,
+    build_frame,
+    draw_sample,
+    load_done,
+    prevalence,
+    run_census,
+    run_deep_tier,
+    run_metadata_tier,
 )
 from ledger.report import DatasetReport
 from ledger.sources import LocalSource
@@ -67,8 +74,11 @@ def test_load_done_excludes_rate_limited_records_so_resume_retries_them(tmp_path
     rows = [
         {"repo": "acme/ok", "revision": "r1", "error": ""},
         {"repo": "acme/missing", "revision": "", "error": "no info.json"},
-        {"repo": "acme/busy", "revision": "",
-         "error": "RateLimited: gave up on https://x after 5 attempts: 429"},
+        {
+            "repo": "acme/busy",
+            "revision": "",
+            "error": "RateLimited: gave up on https://x after 5 attempts: 429",
+        },
     ]
     p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
     done = load_done(p)
@@ -95,7 +105,7 @@ def test_deep_tier_survives_a_broken_dataset(tmp_path):
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
     n = run_deep_tier(["acme/missing", "acme/ok"], LocalSource(root), cfg, out)
     assert n == 2  # both recorded, one carrying an error
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert any(r["error"] for r in rows)
     assert any(not r["error"] for r in rows)
 
@@ -137,7 +147,7 @@ def test_deep_tier_resume_skips_repos_already_in_done(tmp_path):
     done = {"acme/a@"}
     n = run_deep_tier(["acme/a", "acme/b"], LocalSource(root), cfg, out, done=done)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert [r["repo"] for r in rows] == ["acme/b"]
 
 
@@ -172,7 +182,7 @@ def test_deep_tier_notes_a_partial_sample_when_the_source_cannot_check_existence
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=None)
     n = run_deep_tier(["acme/a"], _NoExistsLocalSource(root), cfg, out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert not rows[0]["error"]
     assert "partial" in rows[0]["note"]
 
@@ -184,7 +194,7 @@ def test_deep_tier_does_not_note_partial_when_files_per_dataset_is_bounded(tmp_p
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
     n = run_deep_tier(["acme/a"], _NoExistsLocalSource(root), cfg, out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["note"] == ""
 
 
@@ -197,7 +207,7 @@ def test_deep_tier_does_not_note_partial_when_the_source_can_check_existence(tmp
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=None)
     n = run_deep_tier(["acme/a"], LocalSource(root), cfg, out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["note"] == ""
 
 
@@ -216,7 +226,7 @@ def test_metadata_tier_writes_one_record_per_dataset(tmp_path):
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/a", "acme/b"], LocalSource(root), out)
     assert n == 2
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert [r["repo"] for r in rows] == ["acme/a", "acme/b"]
     assert all(r["codebase"] == "v3.0" for r in rows)
     assert all(not r["error"] for r in rows)
@@ -242,13 +252,15 @@ def test_metadata_tier_tolerates_a_missing_metadata_key(tmp_path):
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/a"], LocalSource(root), out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert not rows[0]["error"]
     assert rows[0]["total_frames"] == 0  # dataclass default, not a raise
     assert rows[0]["total_episodes"] == 1  # the key that *was* present
 
 
-def test_metadata_tier_records_a_distinguishable_error_when_the_hub_rate_limits(monkeypatch, tmp_path):
+def test_metadata_tier_records_a_distinguishable_error_when_the_hub_rate_limits(
+    monkeypatch, tmp_path
+):
     # CRITICAL 2 end to end, through the real HubClient with only _open
     # monkeypatched (no network touched): before the fix, get_info
     # swallowed RateLimited to None and this landed here as the same
@@ -270,7 +282,7 @@ def test_metadata_tier_records_a_distinguishable_error_when_the_hub_rate_limits(
     n = run_metadata_tier(["acme/busy"], source, out)
 
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["error"]
     assert rows[0]["error"] != "no info.json"
     assert "RateLimited" in rows[0]["error"]
@@ -290,7 +302,7 @@ def test_metadata_tier_records_unknown_layout_family_without_failing_the_dataset
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/a"], LocalSource(root), out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert not rows[0]["error"]
     assert rows[0]["layout_family"] == "unknown"
     assert rows[0]["total_episodes"] == 1  # rest of the record is unaffected
@@ -301,7 +313,7 @@ def test_metadata_tier_records_error_for_missing_info(tmp_path):
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/missing"], LocalSource(root), out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["error"]
 
 
@@ -312,7 +324,7 @@ def test_metadata_tier_resume_skips_completed(tmp_path):
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/a", "acme/b"], LocalSource(root), out, done={"acme/a@"})
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert [r["repo"] for r in rows] == ["acme/b"]
 
 
@@ -351,7 +363,7 @@ def test_deep_tier_records_the_real_revision_on_the_report(tmp_path):
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
     n = run_deep_tier(["acme/a"], _RevisionedLocalSource(root, _SHA), cfg, out)
     assert n == 1
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["revision"] == _SHA
 
 
@@ -401,7 +413,7 @@ def test_local_source_without_a_revision_method_still_keys_repo_at_bare(tmp_path
     out = tmp_path / "deep.jsonl"
     cfg = CensusConfig(out_dir=tmp_path, files_per_dataset=1)
     run_deep_tier(["acme/a"], LocalSource(root), cfg, out)
-    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in out.read_text().strip().splitlines()]
     assert rows[0]["revision"] == ""
     assert load_done(out) == {"acme/a@"}
 
@@ -418,7 +430,7 @@ def test_run_census_metadata_tier_only_leaves_deep_jsonl_absent(tmp_path):
     meta_path = tmp_path / "metadata.jsonl"
     deep_path = tmp_path / "deep.jsonl"
     assert meta_path.exists()
-    rows = [json.loads(l) for l in meta_path.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in meta_path.read_text().strip().splitlines()]
     assert [r["repo"] for r in rows] == ["acme/a"]
     assert not deep_path.exists()
 
@@ -434,7 +446,7 @@ def test_run_census_deep_tier_only_leaves_metadata_jsonl_absent(tmp_path):
     meta_path = tmp_path / "metadata.jsonl"
     deep_path = tmp_path / "deep.jsonl"
     assert deep_path.exists()
-    rows = [json.loads(l) for l in deep_path.read_text().strip().splitlines()]
+    rows = [json.loads(line) for line in deep_path.read_text().strip().splitlines()]
     assert [r["repo"] for r in rows] == ["acme/a"]
     assert not meta_path.exists()
 
@@ -483,8 +495,9 @@ def test_build_frame_respects_max_datasets():
 
 
 def test_prevalence_carries_a_confidence_interval():
-    reps = [DatasetReport(repo=f"o/d{i}", flags="stuck_state" if i < 20 else "")
-            for i in range(100)]
+    reps = [
+        DatasetReport(repo=f"o/d{i}", flags="stuck_state" if i < 20 else "") for i in range(100)
+    ]
     rate, lo, hi = prevalence(reps, "stuck_state")
     assert rate == 0.2
     assert lo < 0.2 < hi
@@ -503,5 +516,6 @@ def test_prevalence_matches_flags_joined_by_pipe():
 
 def test_prevalence_empty_reports_is_nan_not_a_crash():
     import math
+
     rate, lo, hi = prevalence([], "stuck_state")
     assert math.isnan(rate) and math.isnan(lo) and math.isnan(hi)

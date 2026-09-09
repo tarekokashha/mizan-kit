@@ -1,13 +1,12 @@
 """Threshold loading and validation. Config, not code."""
+
 from __future__ import annotations
 
 import tomllib
 from pathlib import Path
 
-_REQUIRED = ("frac_bad_dt", "stuck_state_frac", "identity_frac",
-             "lag_large", "dup_episode_frac")
-_FRACTIONS = ("frac_bad_dt", "stuck_state_frac", "identity_frac",
-              "dup_episode_frac")
+_REQUIRED = ("frac_bad_dt", "stuck_state_frac", "identity_frac", "lag_large", "dup_episode_frac")
+_FRACTIONS = ("frac_bad_dt", "stuck_state_frac", "identity_frac", "dup_episode_frac")
 _DEFAULT_PATH = Path(__file__).with_name("thresholds.toml")
 
 

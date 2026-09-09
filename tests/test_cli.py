@@ -8,6 +8,8 @@ offline end to end run of the census wiring against a LocalSource
 fixture, which is the only proof in the whole suite that argparse,
 ledger.census and ledger.sources actually compose correctly together.
 """
+
+import argparse
 import json
 
 import pytest
@@ -24,7 +26,7 @@ def test_files_accepts_an_integer():
 
 
 def test_files_rejects_nonsense():
-    with pytest.raises(Exception):
+    with pytest.raises(argparse.ArgumentTypeError):
         parse_files("banana")
 
 
@@ -65,13 +67,20 @@ def test_census_local_source_runs_end_to_end(tmp_path):
     write_v30_fixture(make_episodes(n_eps=2, T=40, seed=1), root, "acme/x")
     out_dir = tmp_path / "census_out"
 
-    rc = main([
-        "--census", "both",
-        "--source", "local",
-        "--local-root", str(root),
-        "--repos", "acme/x",
-        "--out-dir", str(out_dir),
-    ])
+    rc = main(
+        [
+            "--census",
+            "both",
+            "--source",
+            "local",
+            "--local-root",
+            str(root),
+            "--repos",
+            "acme/x",
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
     assert rc == 0
 
     meta_path = out_dir / "metadata.jsonl"
@@ -79,8 +88,8 @@ def test_census_local_source_runs_end_to_end(tmp_path):
     assert meta_path.exists()
     assert deep_path.exists()
 
-    meta_rows = [json.loads(l) for l in meta_path.read_text().strip().splitlines()]
-    deep_rows = [json.loads(l) for l in deep_path.read_text().strip().splitlines()]
+    meta_rows = [json.loads(line) for line in meta_path.read_text().strip().splitlines()]
+    deep_rows = [json.loads(line) for line in deep_path.read_text().strip().splitlines()]
     assert [r["repo"] for r in meta_rows] == ["acme/x"]
     assert [r["repo"] for r in deep_rows] == ["acme/x"]
     assert deep_rows[0]["episodes_sampled"] == 2
@@ -91,6 +100,16 @@ def test_census_local_source_without_local_root_does_not_touch_network(tmp_path,
     # Misuse guard: --source local with no --repos has no frame to draw
     # from except a live Hub crawl, which must never happen in this
     # suite. This must fail fast, not attempt network access.
-    rc = main(["--census", "metadata", "--source", "local",
-              "--local-root", str(tmp_path), "--out-dir", str(tmp_path / "out")])
+    rc = main(
+        [
+            "--census",
+            "metadata",
+            "--source",
+            "local",
+            "--local-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / "out"),
+        ]
+    )
     assert rc != 0

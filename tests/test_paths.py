@@ -1,13 +1,25 @@
 import pytest
+
 from ledger.paths import (
-    derive_paths, layout_family, estimate_file_count, packed_sample_is_partial,
+    derive_paths,
+    estimate_file_count,
+    layout_family,
+    packed_sample_is_partial,
 )
 from ledger.sources import LocalSource
 
-V20 = {"codebase_version": "v2.0", "chunks_size": 1000, "total_episodes": 2500,
-       "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"}
-V30 = {"codebase_version": "v3.0", "chunks_size": 1000, "total_episodes": 50,
-       "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+V20 = {
+    "codebase_version": "v2.0",
+    "chunks_size": 1000,
+    "total_episodes": 2500,
+    "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+}
+V30 = {
+    "codebase_version": "v3.0",
+    "chunks_size": 1000,
+    "total_episodes": 50,
+    "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+}
 
 
 def test_family_detection():
@@ -17,9 +29,11 @@ def test_family_detection():
 
 def test_v20_paths_are_derived_arithmetically():
     p = derive_paths(V20, limit=3)
-    assert p == ["data/chunk-000/episode_000000.parquet",
-                 "data/chunk-000/episode_000001.parquet",
-                 "data/chunk-000/episode_000002.parquet"]
+    assert p == [
+        "data/chunk-000/episode_000000.parquet",
+        "data/chunk-000/episode_000001.parquet",
+        "data/chunk-000/episode_000002.parquet",
+    ]
 
 
 def test_v20_chunk_rolls_over_at_chunks_size():
@@ -52,9 +66,11 @@ def test_v30_limit_none_with_exists_discovers_every_file(tmp_path):
         p.write_bytes(b"")
     source = LocalSource(tmp_path)
     paths = derive_paths(V30, limit=None, exists=lambda p: source.exists(repo, p))
-    assert paths == ["data/chunk-000/file-000.parquet",
-                     "data/chunk-000/file-001.parquet",
-                     "data/chunk-000/file-002.parquet"]
+    assert paths == [
+        "data/chunk-000/file-000.parquet",
+        "data/chunk-000/file-001.parquet",
+        "data/chunk-000/file-002.parquet",
+    ]
 
 
 def test_v30_limit_two_with_exists_still_yields_exactly_two(tmp_path):
@@ -67,8 +83,7 @@ def test_v30_limit_two_with_exists_still_yields_exactly_two(tmp_path):
         p.write_bytes(b"")
     source = LocalSource(tmp_path)
     paths = derive_paths(V30, limit=2, exists=lambda p: source.exists(repo, p))
-    assert paths == ["data/chunk-000/file-000.parquet",
-                     "data/chunk-000/file-001.parquet"]
+    assert paths == ["data/chunk-000/file-000.parquet", "data/chunk-000/file-001.parquet"]
 
 
 def test_v30_limit_none_with_exists_stops_at_the_first_gap(tmp_path):

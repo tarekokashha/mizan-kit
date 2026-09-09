@@ -70,8 +70,13 @@ from ledger.synth import make_episodes, DEFECTS
 def test_clean_shape_and_dtypes():
     df = make_episodes(fps=30.0, n_eps=4, T=100, n_joints=6, seed=1)
     assert len(df) == 400
-    assert set(df.columns) == {"timestamp", "frame_index", "episode_index",
-                               "action", "observation.state"}
+    assert set(df.columns) == {
+        "timestamp",
+        "frame_index",
+        "episode_index",
+        "action",
+        "observation.state",
+    }
     assert df["episode_index"].nunique() == 4
     assert len(df["action"].iloc[0]) == 6
 
@@ -79,15 +84,13 @@ def test_clean_shape_and_dtypes():
 def test_is_deterministic_under_seed():
     a = make_episodes(seed=7)
     b = make_episodes(seed=7)
-    assert np.array_equal(np.stack(a["action"].to_numpy()),
-                          np.stack(b["action"].to_numpy()))
+    assert np.array_equal(np.stack(a["action"].to_numpy()), np.stack(b["action"].to_numpy()))
 
 
 def test_different_seeds_differ():
     a = make_episodes(seed=1)
     b = make_episodes(seed=2)
-    assert not np.array_equal(np.stack(a["action"].to_numpy()),
-                              np.stack(b["action"].to_numpy()))
+    assert not np.array_equal(np.stack(a["action"].to_numpy()), np.stack(b["action"].to_numpy()))
 
 
 @pytest.mark.parametrize("defect", DEFECTS)
@@ -121,6 +124,7 @@ episodes. Use `np.random.default_rng(seed)` and never the global RNG.
 Used by the demo, the unit tests and the property based calibration.
 Every function is pure given its seed.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -129,9 +133,16 @@ import pandas as pd
 DEFECTS = ("", "identity", "drops", "stuck", "swapped", "duplicate")
 
 
-def make_episodes(fps: float = 30.0, n_eps: int = 6, T: int = 300,
-                  n_joints: int = 6, lag: int = 2, defect: str = "",
-                  seed: int = 0, noise: float = 1e-3) -> pd.DataFrame:
+def make_episodes(
+    fps: float = 30.0,
+    n_eps: int = 6,
+    T: int = 300,
+    n_joints: int = 6,
+    lag: int = 2,
+    defect: str = "",
+    seed: int = 0,
+    noise: float = 1e-3,
+) -> pd.DataFrame:
     if defect not in DEFECTS:
         raise ValueError(f"unknown defect {defect!r}, expected one of {DEFECTS}")
     rng = np.random.default_rng(seed)
@@ -140,7 +151,7 @@ def make_episodes(fps: float = 30.0, n_eps: int = 6, T: int = 300,
     for e in range(n_eps):
         t = np.arange(T) / fps
         base = np.cumsum(rng.normal(0, 0.02, size=(T + lag + 5, n_joints)), axis=0)
-        action = base[lag:T + lag]
+        action = base[lag : T + lag]
         state = base[:T] + rng.normal(0, noise, size=(T, n_joints))
         if defect == "identity":
             action = state.copy()
@@ -158,13 +169,15 @@ def make_episodes(fps: float = 30.0, n_eps: int = 6, T: int = 300,
         if e == 0:
             first_action = action
         for i in range(len(t)):
-            rows.append({
-                "timestamp": np.float32(t[i]),
-                "frame_index": i,
-                "episode_index": e,
-                "action": action[i].astype(np.float32),
-                "observation.state": state[i].astype(np.float32),
-            })
+            rows.append(
+                {
+                    "timestamp": np.float32(t[i]),
+                    "frame_index": i,
+                    "episode_index": e,
+                    "action": action[i].astype(np.float32),
+                    "observation.state": state[i].astype(np.float32),
+                }
+            )
     return pd.DataFrame(rows)
 ```
 
@@ -222,12 +235,17 @@ def write_v20_fixture(df: pd.DataFrame, root, repo: str, fps: float = 30.0) -> d
         p = root / f"data/chunk-000/episode_{int(ep):06d}.parquet"
         p.parent.mkdir(parents=True, exist_ok=True)
         sub.to_parquet(p, index=False)
-    return _write_info(root, {
-        "codebase_version": "v2.0", "fps": fps, "chunks_size": 1000,
-        "total_episodes": int(df["episode_index"].nunique()),
-        "total_frames": int(len(df)),
-        "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
-    })
+    return _write_info(
+        root,
+        {
+            "codebase_version": "v2.0",
+            "fps": fps,
+            "chunks_size": 1000,
+            "total_episodes": int(df["episode_index"].nunique()),
+            "total_frames": int(len(df)),
+            "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+        },
+    )
 
 
 def write_v30_fixture(df: pd.DataFrame, root, repo: str, fps: float = 30.0) -> dict:
@@ -235,12 +253,17 @@ def write_v30_fixture(df: pd.DataFrame, root, repo: str, fps: float = 30.0) -> d
     p = root / "data/chunk-000/file-000.parquet"
     p.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(p, index=False)
-    return _write_info(root, {
-        "codebase_version": "v3.0", "fps": fps, "chunks_size": 1000,
-        "total_episodes": int(df["episode_index"].nunique()),
-        "total_frames": int(len(df)),
-        "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
-    })
+    return _write_info(
+        root,
+        {
+            "codebase_version": "v3.0",
+            "fps": fps,
+            "chunks_size": 1000,
+            "total_episodes": int(df["episode_index"].nunique()),
+            "total_frames": int(len(df)),
+            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+        },
+    )
 ```
 
 Also create `tests/conftest.py` registering the network marker so live
@@ -309,8 +332,7 @@ def _stats(defect="", **kw):
 
 
 def test_registry_is_populated():
-    assert {"frac_bad_dt", "stuck_state_frac", "identity_frac",
-            "dup_episode_frac"} <= set(REGISTRY)
+    assert {"frac_bad_dt", "stuck_state_frac", "identity_frac", "dup_episode_frac"} <= set(REGISTRY)
 
 
 def test_clean_episode_is_quiet():
@@ -338,7 +360,8 @@ def test_xcorr_recovers_positive_lag():
 
 
 def test_xcorr_returns_nan_for_short_series():
-    a = np.zeros((5, 6)); s = np.zeros((5, 6))
+    a = np.zeros((5, 6))
+    s = np.zeros((5, 6))
     best, r0, rb = xcorr_lag(a, s, range(-5, 11))
     assert np.isnan(r0) and np.isnan(rb)
 ```
@@ -362,6 +385,7 @@ Adding a check is adding a function. The report schema, the CSV columns
 and the flag names are all derived from REGISTRY, so they cannot drift
 apart from the checks that fill them.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -384,11 +408,11 @@ class Check:
 REGISTRY: dict[str, Check] = {}
 
 
-def register(name: str, threshold_key: str | None = None,
-             higher_is_worse: bool = True):
+def register(name: str, threshold_key: str | None = None, higher_is_worse: bool = True):
     def deco(fn):
         REGISTRY[name] = Check(name, fn, threshold_key or name, higher_is_worse)
         return fn
+
     return deco
 
 
@@ -429,9 +453,9 @@ def xcorr_lag(action, state, lags: Iterable[int] = LAGS):
     scores = {}
     for k in lags:
         if k >= 0:
-            aa, st = a[:T - k], s[k:]
+            aa, st = a[: T - k], s[k:]
         else:
-            aa, st = a[-k:], s[:T + k]
+            aa, st = a[-k:], s[: T + k]
         if len(aa) < 20:
             continue
         scores[k] = float(np.nanmean(((aa * st).mean(0)) / (sa * ss)))
@@ -530,8 +554,10 @@ def test_defaults_match_v0_values():
 
 def test_rejects_out_of_range_fraction(tmp_path):
     p = tmp_path / "bad.toml"
-    p.write_text("[thresholds]\nfrac_bad_dt = 1.5\nstuck_state_frac = 0.2\n"
-                 "identity_frac = 0.5\nlag_large = 3\ndup_episode_frac = 0.0\n")
+    p.write_text(
+        "[thresholds]\nfrac_bad_dt = 1.5\nstuck_state_frac = 0.2\n"
+        "identity_frac = 0.5\nlag_large = 3\ndup_episode_frac = 0.0\n"
+    )
     with pytest.raises(ValueError, match="frac_bad_dt"):
         load_thresholds(p)
 
@@ -570,15 +596,14 @@ dup_episode_frac = 0.0
 ```python
 # ledger/config.py
 """Threshold loading and validation. Config, not code."""
+
 from __future__ import annotations
 
 import tomllib
 from pathlib import Path
 
-_REQUIRED = ("frac_bad_dt", "stuck_state_frac", "identity_frac",
-             "lag_large", "dup_episode_frac")
-_FRACTIONS = ("frac_bad_dt", "stuck_state_frac", "identity_frac",
-              "dup_episode_frac")
+_REQUIRED = ("frac_bad_dt", "stuck_state_frac", "identity_frac", "lag_large", "dup_episode_frac")
+_FRACTIONS = ("frac_bad_dt", "stuck_state_frac", "identity_frac", "dup_episode_frac")
 _DEFAULT_PATH = Path(__file__).with_name("thresholds.toml")
 
 
@@ -635,6 +660,7 @@ guess into a measured false positive rate.
 """Calibration: thresholds must not fire on clean data, and the lag
 estimator must recover a lag it was given. Both are properties, checked
 over randomised but seeded configurations."""
+
 import numpy as np
 from hypothesis import given, settings, strategies as st
 
@@ -654,8 +680,7 @@ T_ = load_thresholds()
 )
 @settings(max_examples=150, deadline=None)
 def test_clean_data_never_trips_a_threshold(fps, n_joints, T, lag, seed):
-    df = make_episodes(fps=fps, n_eps=1, T=T, n_joints=n_joints,
-                       lag=lag, defect="", seed=seed)
+    df = make_episodes(fps=fps, n_eps=1, T=T, n_joints=n_joints, lag=lag, defect="", seed=seed)
     v = run_checks(episode_stats(df, fps))
     assert v["frac_bad_dt"] <= T_["frac_bad_dt"]
     assert v["identity_frac"] <= T_["identity_frac"]
@@ -669,8 +694,7 @@ def test_clean_data_never_trips_a_threshold(fps, n_joints, T, lag, seed):
 )
 @settings(max_examples=100, deadline=None)
 def test_injected_lag_is_recovered(lag, n_joints, seed):
-    df = make_episodes(n_eps=1, T=400, n_joints=n_joints, lag=lag,
-                       defect="", seed=seed)
+    df = make_episodes(n_eps=1, T=400, n_joints=n_joints, lag=lag, defect="", seed=seed)
     a = np.stack(df["action"].to_numpy())
     s = np.stack(df["observation.state"].to_numpy())
     best, _, _ = xcorr_lag(a, s)
@@ -736,10 +760,18 @@ punishes hardest.
 import pytest
 from ledger.paths import derive_paths, layout_family, estimate_file_count
 
-V20 = {"codebase_version": "v2.0", "chunks_size": 1000, "total_episodes": 2500,
-       "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"}
-V30 = {"codebase_version": "v3.0", "chunks_size": 1000, "total_episodes": 50,
-       "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+V20 = {
+    "codebase_version": "v2.0",
+    "chunks_size": 1000,
+    "total_episodes": 2500,
+    "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+}
+V30 = {
+    "codebase_version": "v3.0",
+    "chunks_size": 1000,
+    "total_episodes": 50,
+    "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+}
 
 
 def test_family_detection():
@@ -749,9 +781,11 @@ def test_family_detection():
 
 def test_v20_paths_are_derived_arithmetically():
     p = derive_paths(V20, limit=3)
-    assert p == ["data/chunk-000/episode_000000.parquet",
-                 "data/chunk-000/episode_000001.parquet",
-                 "data/chunk-000/episode_000002.parquet"]
+    assert p == [
+        "data/chunk-000/episode_000000.parquet",
+        "data/chunk-000/episode_000001.parquet",
+        "data/chunk-000/episode_000002.parquet",
+    ]
 
 
 def test_v20_chunk_rolls_over_at_chunks_size():
@@ -796,6 +830,7 @@ Two families exist on the Hub:
   packed       v3.x, episodes packed into large files, count unknown
                without meta/episodes, so paths are probed in order.
 """
+
 from __future__ import annotations
 
 
@@ -822,8 +857,7 @@ def derive_paths(info: dict, limit: int | None = None) -> list[str]:
         n = int(info.get("total_episodes", 0))
         if limit is not None:
             n = min(n, limit)
-        return [tmpl.format(episode_chunk=e // chunk, episode_index=e)
-                for e in range(n)]
+        return [tmpl.format(episode_chunk=e // chunk, episode_index=e) for e in range(n)]
     n = limit if limit is not None else 1
     return [tmpl.format(chunk_index=0, file_index=f) for f in range(n)]
 ```
@@ -865,10 +899,18 @@ from ledger.hubclient import HubClient, RateLimited
 
 class FakeResp:
     def __init__(self, body, headers=None, status=200):
-        self._b = json.dumps(body).encode(); self.headers = headers or {}; self.status = status
-    def read(self): return self._b
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
+        self._b = json.dumps(body).encode()
+        self.headers = headers or {}
+        self.status = status
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
 def test_retries_then_succeeds(monkeypatch):
@@ -946,6 +988,7 @@ Measured on 2026-09-05: anonymous requests hit HTTP 429 with
 "maximum queue size reached" within tens of requests, on both the api
 and resolve hosts. A census therefore needs a token and needs to behave.
 """
+
 from __future__ import annotations
 
 import json
@@ -970,15 +1013,21 @@ def _discover_token() -> str | None:
         return tok.strip()
     try:
         from huggingface_hub import get_token
+
         return get_token()
     except Exception:
         return None
 
 
 class HubClient:
-    def __init__(self, min_interval: float = 0.2, max_retries: int = 5,
-                 timeout: float = 45.0, token: str | None = None,
-                 user_agent: str = "mizan-ledger/0.1"):
+    def __init__(
+        self,
+        min_interval: float = 0.2,
+        max_retries: int = 5,
+        timeout: float = 45.0,
+        token: str | None = None,
+        user_agent: str = "mizan-ledger/0.1",
+    ):
         self.min_interval = min_interval
         self.max_retries = max_retries
         self.timeout = timeout
@@ -1016,13 +1065,13 @@ class HubClient:
                 last = e
                 if e.code in (429, 500, 502, 503, 504):
                     ra = e.headers.get("Retry-After") if e.headers else None
-                    wait = float(ra) if ra and str(ra).isdigit() else 2 ** attempt
+                    wait = float(ra) if ra and str(ra).isdigit() else 2**attempt
                     time.sleep(wait + random.uniform(0, 0.4))
                     continue
                 raise
             except (urllib.error.URLError, TimeoutError) as e:
                 last = e
-                time.sleep(2 ** attempt + random.uniform(0, 0.4))
+                time.sleep(2**attempt + random.uniform(0, 0.4))
         raise RateLimited(f"gave up on {url} after {self.max_retries} attempts: {last}")
 
     def get_json(self, url: str):
@@ -1039,8 +1088,9 @@ class HubClient:
         except (RateLimited, json.JSONDecodeError):
             return None
 
-    def iter_datasets(self, filter_tag: str = "LeRobot", page_size: int = 1000,
-                      max_pages: int | None = None) -> Iterator[dict]:
+    def iter_datasets(
+        self, filter_tag: str = "LeRobot", page_size: int = 1000, max_pages: int | None = None
+    ) -> Iterator[dict]:
         url = f"{API}/datasets?filter={filter_tag}&limit={page_size}"
         pages = 0
         while url and (max_pages is None or pages < max_pages):
@@ -1130,6 +1180,7 @@ def test_synthetic_source_is_offline():
 
 def test_projection_drops_non_audit_columns(tmp_path):
     import pandas as pd
+
     df = make_episodes(n_eps=1, T=20, seed=2)
     df["observation.images.top"] = [b"x" * 1024] * len(df)
     p = tmp_path / "acme/v30/data/chunk-000/file-000.parquet"
@@ -1138,7 +1189,8 @@ def test_projection_drops_non_audit_columns(tmp_path):
     (tmp_path / "acme/v30/meta").mkdir(parents=True, exist_ok=True)
     (tmp_path / "acme/v30/meta/info.json").write_text(
         '{"codebase_version":"v3.0","fps":30,"chunks_size":1000,"total_episodes":1,'
-        '"data_path":"data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}')
+        '"data_path":"data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}'
+    )
     out = LocalSource(tmp_path).frames("acme/v30", "data/chunk-000/file-000.parquet")
     assert "observation.images.top" not in out.columns
 ```
@@ -1159,6 +1211,7 @@ whether they are reading the Hub, a fixture, or a generator. Measured on
 2026-09-05: the five audit columns are 2.7 percent of compressed bytes,
 so projecting is worth roughly 37x in transfer.
 """
+
 from __future__ import annotations
 
 import json
@@ -1172,8 +1225,7 @@ from .hubclient import HubClient
 from .paths import derive_paths
 from . import synth
 
-AUDIT_COLUMNS = ("timestamp", "frame_index", "episode_index",
-                 "action", "observation.state")
+AUDIT_COLUMNS = ("timestamp", "frame_index", "episode_index", "action", "observation.state")
 
 
 def read_projected(handle) -> pd.DataFrame:
@@ -1199,8 +1251,10 @@ class LocalSource:
         return json.loads(p.read_text()) if p.exists() else None
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
-        found = sorted(str(p.relative_to(self.root / repo).as_posix())
-                       for p in (self.root / repo).glob("data/**/*.parquet"))
+        found = sorted(
+            str(p.relative_to(self.root / repo).as_posix())
+            for p in (self.root / repo).glob("data/**/*.parquet")
+        )
         return found[:limit] if limit else found
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
@@ -1214,9 +1268,13 @@ class SyntheticSource:
         self.defect, self.fps, self.kw = defect, fps, kw
 
     def info(self, repo: str) -> dict:
-        return {"codebase_version": "demo", "fps": self.fps, "chunks_size": 1000,
-                "total_episodes": self.kw.get("n_eps", 6),
-                "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"}
+        return {
+            "codebase_version": "demo",
+            "fps": self.fps,
+            "chunks_size": 1000,
+            "total_episodes": self.kw.get("n_eps", 6),
+            "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+        }
 
     def parquet_paths(self, repo: str, info: dict, limit: int | None = None) -> list[str]:
         return ["synthetic://0"]
@@ -1231,6 +1289,7 @@ class StreamingSource:
     def __init__(self, client: HubClient | None = None):
         self.client = client or HubClient()
         from huggingface_hub import HfFileSystem
+
         self._fs = HfFileSystem()
 
     def info(self, repo: str) -> dict | None:
@@ -1259,6 +1318,7 @@ class DownloadSource:
 
     def frames(self, repo: str, path: str) -> pd.DataFrame:
         from huggingface_hub import hf_hub_download
+
         local = hf_hub_download(repo, path, repo_type="dataset")
         try:
             return read_projected(local)
@@ -1299,15 +1359,25 @@ git commit -m "Add SampleSource abstraction with streaming, download, local and 
 ```python
 # tests/test_report.py
 import numpy as np
-from ledger.report import (DatasetReport, audit_dataframe, summarise,
-                           write_csv, append_jsonl, read_jsonl, PROVISIONAL_HEADER)
+from ledger.report import (
+    DatasetReport,
+    audit_dataframe,
+    summarise,
+    write_csv,
+    append_jsonl,
+    read_jsonl,
+    PROVISIONAL_HEADER,
+)
 from ledger.synth import make_episodes
 
 
 def _rep(defect):
     df = make_episodes(defect=defect, seed=0)
-    return summarise(f"synthetic/{defect or 'clean'}",
-                     {"codebase_version": "demo", "fps": 30}, audit_dataframe(df, 30.0))
+    return summarise(
+        f"synthetic/{defect or 'clean'}",
+        {"codebase_version": "demo", "fps": 30},
+        audit_dataframe(df, 30.0),
+    )
 
 
 def test_clean_has_no_flags():
@@ -1408,8 +1478,7 @@ git commit -m "Add report module separating provisional flags from confirmed fin
 # tests/test_census.py
 import json
 import pytest
-from ledger.census import (CensusConfig, draw_sample, load_done,
-                           run_deep_tier, prevalence)
+from ledger.census import CensusConfig, draw_sample, load_done, run_deep_tier, prevalence
 from ledger.report import DatasetReport
 from ledger.sources import LocalSource
 from ledger.synth import make_episodes, write_v30_fixture
@@ -1457,8 +1526,9 @@ def test_deep_tier_survives_a_broken_dataset(tmp_path):
 
 
 def test_prevalence_carries_a_confidence_interval():
-    reps = [DatasetReport(repo=f"o/d{i}", flags="stuck_state" if i < 20 else "")
-            for i in range(100)]
+    reps = [
+        DatasetReport(repo=f"o/d{i}", flags="stuck_state" if i < 20 else "") for i in range(100)
+    ]
     rate, lo, hi = prevalence(reps, "stuck_state")
     assert rate == 0.2
     assert lo < 0.2 < hi

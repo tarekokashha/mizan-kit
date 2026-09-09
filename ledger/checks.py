@@ -22,11 +22,12 @@ AGGREGATE_FLAGS names the flags that come from those two measurements.
 They are computed in report.py from all episodes together, not by this
 registry.
 """
+
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable
 
 import numpy as np
 
@@ -42,7 +43,7 @@ AGGREGATE_FLAGS = ("large_lag", "negative_lag", "duplicate_episodes")
 @dataclass(frozen=True)
 class Check:
     name: str
-    fn: Callable[["EpisodeStats"], float]
+    fn: Callable[[EpisodeStats], float]
     threshold_key: str | None
     higher_is_worse: bool
 
@@ -50,11 +51,11 @@ class Check:
 REGISTRY: dict[str, Check] = {}
 
 
-def register(name: str, threshold_key: str | None = None,
-             higher_is_worse: bool = True):
+def register(name: str, threshold_key: str | None = None, higher_is_worse: bool = True):
     def deco(fn):
         REGISTRY[name] = Check(name, fn, threshold_key or name, higher_is_worse)
         return fn
+
     return deco
 
 
@@ -128,9 +129,9 @@ def xcorr_lag(action, state, lags: Iterable[int] = LAGS):
     scores = {}
     for k in lags:
         if k >= 0:
-            aa, st = a[:T - k], s[k:]
+            aa, st = a[: T - k], s[k:]
         else:
-            aa, st = a[-k:], s[:T + k]
+            aa, st = a[-k:], s[: T + k]
         if len(aa) < 20:
             continue
         scores[k] = float(np.nanmean(((aa * st).mean(0)) / (sa * ss)))

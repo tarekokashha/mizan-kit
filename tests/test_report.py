@@ -16,23 +16,32 @@ ledger.report to itself and always pass regardless of what the refactor
 did. tests/v0_reference.py cannot change out from under this test, so
 the comparison stays a real check.
 """
+
 import math
 
 import numpy as np
 
-from tests.v0_reference import audit_frame as v0_audit_frame
-from tests.v0_reference import summarise as v0_summarise
 from ledger.report import (
-    DatasetReport, audit_frame, summarise, write_csv, append_jsonl,
-    read_jsonl, PROVISIONAL_HEADER,
+    PROVISIONAL_HEADER,
+    DatasetReport,
+    append_jsonl,
+    audit_frame,
+    read_jsonl,
+    summarise,
+    write_csv,
 )
 from ledger.synth import DEFECTS, make_episodes
+from tests.v0_reference import audit_frame as v0_audit_frame
+from tests.v0_reference import summarise as v0_summarise
 
 
 def _rep(defect):
     df = make_episodes(defect=defect, seed=0)
-    return summarise(f"synthetic/{defect or 'clean'}",
-                     {"codebase_version": "demo", "fps": 30}, [audit_frame(df, 30.0)])
+    return summarise(
+        f"synthetic/{defect or 'clean'}",
+        {"codebase_version": "demo", "fps": 30},
+        [audit_frame(df, 30.0)],
+    )
 
 
 def test_clean_has_no_flags():
@@ -146,19 +155,33 @@ def test_report_reproduces_v0_exactly_for_every_defect():
     fails, the fix belongs in report.py, not in this test.
     """
     numeric_fields = (
-        "fps", "episodes_sampled", "frames_sampled", "ts_nonmonotonic_eps",
-        "frac_bad_dt", "dt_jitter_ratio", "frame_gap_eps", "stuck_state_frac",
-        "identity_frac", "lag_frames", "r_lag0", "r_best", "dup_episode_frac",
+        "fps",
+        "episodes_sampled",
+        "frames_sampled",
+        "ts_nonmonotonic_eps",
+        "frac_bad_dt",
+        "dt_jitter_ratio",
+        "frame_gap_eps",
+        "stuck_state_frac",
+        "identity_frac",
+        "lag_frames",
+        "r_lag0",
+        "r_best",
+        "dup_episode_frac",
     )
     for defect in DEFECTS:
         df = make_episodes(defect=defect, seed=0)
         v0 = v0_summarise("t", {"fps": 30}, [v0_audit_frame(df, 30.0)])
         new = summarise("t", {"fps": 30}, [audit_frame(df, 30.0)])
-        assert new.flags == v0.flags, f"defect={defect!r} flags differ: v0={v0.flags!r} new={new.flags!r}"
+        assert new.flags == v0.flags, (
+            f"defect={defect!r} flags differ: v0={v0.flags!r} new={new.flags!r}"
+        )
         assert new.codebase == v0.codebase, f"defect={defect!r} codebase"
         assert new.note == v0.note, f"defect={defect!r} note"
         for field in numeric_fields:
-            _assert_field_equal(getattr(v0, field), getattr(new, field), f"defect={defect!r} field={field}")
+            _assert_field_equal(
+                getattr(v0, field), getattr(new, field), f"defect={defect!r} field={field}"
+            )
 
 
 def test_multi_part_pooling_matches_v0_with_unequal_parts():
@@ -192,13 +215,15 @@ def test_multi_part_pooling_matches_v0_with_unequal_parts():
         dict(n_eps=3, T=130, n_joints=8, lag=6, defect="", seed=104),
     ]
     dfs = [make_episodes(fps=30.0, **spec) for spec in specs]
-    assert [int(df["episode_index"].nunique()) for df in dfs] == [2, 2, 1, 3], \
+    assert [int(df["episode_index"].nunique()) for df in dfs] == [2, 2, 1, 3], (
         "part shapes must carry different episode counts"
+    )
 
     v0_parts = [v0_audit_frame(df, 30.0) for df in dfs]
     new_parts = [audit_frame(df, 30.0) for df in dfs]
-    assert len({p["frames"] for p in v0_parts}) == len(v0_parts), \
+    assert len({p["frames"] for p in v0_parts}) == len(v0_parts), (
         "part shapes must carry different frame counts"
+    )
 
     v0 = v0_summarise("t", {"fps": 30}, v0_parts)
     new = summarise("t", {"fps": 30}, new_parts)
@@ -210,13 +235,24 @@ def test_multi_part_pooling_matches_v0_with_unequal_parts():
     naive_lag_frames = float(np.mean(per_part_medians))
     assert abs(naive_lag_frames - v0.lag_frames) > 0.5, (
         "chosen part shapes do not create a pooling divergence: "
-        f"naive={naive_lag_frames} pooled(v0)={v0.lag_frames}")
+        f"naive={naive_lag_frames} pooled(v0)={v0.lag_frames}"
+    )
 
     assert new.flags == v0.flags, f"flags differ: v0={v0.flags!r} new={new.flags!r}"
     numeric_fields = (
-        "fps", "episodes_sampled", "frames_sampled", "ts_nonmonotonic_eps",
-        "frac_bad_dt", "dt_jitter_ratio", "frame_gap_eps", "stuck_state_frac",
-        "identity_frac", "lag_frames", "r_lag0", "r_best", "dup_episode_frac",
+        "fps",
+        "episodes_sampled",
+        "frames_sampled",
+        "ts_nonmonotonic_eps",
+        "frac_bad_dt",
+        "dt_jitter_ratio",
+        "frame_gap_eps",
+        "stuck_state_frac",
+        "identity_frac",
+        "lag_frames",
+        "r_lag0",
+        "r_best",
+        "dup_episode_frac",
     )
     for field in numeric_fields:
         _assert_field_equal(getattr(v0, field), getattr(new, field), f"field={field}")

@@ -22,6 +22,7 @@ repository. None of that is an observable difference in the report's
 actual content, so normalising both sides to "\n" before comparing is
 the correct, robust check, not a weakened one.
 """
+
 from pathlib import Path
 
 from ledger.audit import demo

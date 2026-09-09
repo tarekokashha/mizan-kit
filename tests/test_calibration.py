@@ -10,8 +10,10 @@ fails, the minimal failing configuration hypothesis prints is the thing
 to fix, either in the check itself or by widening the threshold with a
 recorded reason.
 """
+
 import numpy as np
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from ledger.checks import episode_stats, run_checks, xcorr_lag
 from ledger.config import load_thresholds
@@ -29,8 +31,7 @@ T_ = load_thresholds()
 )
 @settings(max_examples=150, deadline=None)
 def test_clean_data_never_trips_a_threshold(fps, n_joints, T, lag, seed):
-    df = make_episodes(fps=fps, n_eps=1, T=T, n_joints=n_joints,
-                       lag=lag, defect="", seed=seed)
+    df = make_episodes(fps=fps, n_eps=1, T=T, n_joints=n_joints, lag=lag, defect="", seed=seed)
     v = run_checks(episode_stats(df, fps))
     assert v["frac_bad_dt"] <= T_["frac_bad_dt"]
     assert v["identity_frac"] <= T_["identity_frac"]
@@ -81,9 +82,9 @@ def _independent_score_at_lag(action, state, lag):
     sa = a.std(axis=0) + 1e-9
     ss = s.std(axis=0) + 1e-9
     if lag >= 0:
-        aa, shifted = a[:T - lag], s[lag:]
+        aa, shifted = a[: T - lag], s[lag:]
     else:
-        aa, shifted = a[-lag:], s[:T + lag]
+        aa, shifted = a[-lag:], s[: T + lag]
     per_joint = (aa * shifted).mean(axis=0) / (sa * ss)
     return float(np.nanmean(per_joint))
 
@@ -95,8 +96,7 @@ def _independent_score_at_lag(action, state, lag):
 )
 @settings(max_examples=100, deadline=None)
 def test_injected_lag_is_recovered(lag, n_joints, seed):
-    df = make_episodes(n_eps=1, T=400, n_joints=n_joints, lag=lag,
-                       defect="", seed=seed)
+    df = make_episodes(n_eps=1, T=400, n_joints=n_joints, lag=lag, defect="", seed=seed)
     a = np.stack(df["action"].to_numpy())
     s = np.stack(df["observation.state"].to_numpy())
     best, _, r_best = xcorr_lag(a, s)
@@ -105,7 +105,8 @@ def test_injected_lag_is_recovered(lag, n_joints, seed):
     # ignores its inputs or reports the wrong sign fails here directly.
     assert abs(best - lag) <= 1, (
         f"lag={lag} n_joints={n_joints} seed={seed} recovered as {best}, "
-        f"more than one frame off the injected lag")
+        f"more than one frame off the injected lag"
+    )
     if best == lag:
         return
     # r_true is computed by the independent helper above, not by
@@ -115,7 +116,8 @@ def test_injected_lag_is_recovered(lag, n_joints, seed):
     gap = r_best - r_true
     assert gap <= LAG_SCORE_TOLERANCE, (
         f"lag={lag} n_joints={n_joints} seed={seed} recovered as {best} "
-        f"with a real score gap of {gap:.5f}, not a near tie")
+        f"with a real score gap of {gap:.5f}, not a near tie"
+    )
 
 
 @given(seed=st.integers(min_value=0, max_value=10_000))

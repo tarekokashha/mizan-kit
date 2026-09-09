@@ -13,9 +13,10 @@ IMPORTANT 3: the two families are not symmetric under limit=None. See
 derive_paths's own docstring for what that means and how a caller
 supplies an `exists` check to close the gap for packed datasets too.
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def layout_family(info: dict) -> str:
@@ -33,8 +34,9 @@ def estimate_file_count(info: dict) -> int | None:
     return None
 
 
-def derive_paths(info: dict, limit: int | None = None,
-                 exists: Callable[[str], bool] | None = None) -> list[str]:
+def derive_paths(
+    info: dict, limit: int | None = None, exists: Callable[[str], bool] | None = None
+) -> list[str]:
     """Format the parquet paths a dataset's data_path template predicts.
 
     The two families are NOT symmetric under limit=None, and that
@@ -70,8 +72,7 @@ def derive_paths(info: dict, limit: int | None = None,
         n = int(info.get("total_episodes", 0))
         if limit is not None:
             n = min(n, limit)
-        return [tmpl.format(episode_chunk=e // chunk, episode_index=e)
-                for e in range(n)]
+        return [tmpl.format(episode_chunk=e // chunk, episode_index=e) for e in range(n)]
     if limit is None and exists is not None:
         paths: list[str] = []
         f = 0
