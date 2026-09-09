@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mizan-kit"
+version = "0.2.0"
+description = "Statistics, dataset auditing and hardware harnesses for the MIZAN robotics research programme"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Tarek" }]
+keywords = [
+    "robotics",
+    "lerobot",
+    "dataset-quality",
+    "anytime-valid-inference",
+    "confidence-sequences",
+    "universal-robots",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.0",
+    "pyarrow>=15",
+    "huggingface_hub>=0.25",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "hypothesis>=6"]
+hardware = ["ur_rtde>=1.5"]
+dev = ["mizan-kit[test]", "ruff>=0.6"]
+
+[project.scripts]
+mizan-audit = "ledger.audit:main"
+
+[project.urls]
+Homepage = "https://github.com/tarekokasha22/mizan-kit"
+Repository = "https://github.com/tarekokasha22/mizan-kit"
+Issues = "https://github.com/tarekokasha22/mizan-kit/issues"
+
+[tool.setuptools]
+packages = ["cairo_protocol", "ledger", "lerobot_ur"]
+
+[tool.setuptools.package-data]
+ledger = ["thresholds.toml"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "network: hits the live Hugging Face Hub, deselected unless -m network is given",
+]
+filterwarnings = ["error::DeprecationWarning:ledger.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Scope: this repo lints the census code it owns. cairo_protocol and
+# lerobot_ur belong to other MIZAN programmes and CLAUDE.md forbids editing
+# them from here, so reformatting them would violate the one active front
+# rule. tests/v0_reference.py is a frozen v0 snapshot and must stay verbatim,
+# and the two v0 test modules are protected by the same contract.
+extend-exclude = [
+    ".venv",
+    "cairo_protocol",
+    "lerobot_ur",
+    "tests/v0_reference.py",
+    "tests/test_audit.py",
+    "tests/test_stats.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]

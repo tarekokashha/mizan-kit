@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+title: "MIZAN kit: statistics, dataset auditing and hardware harnesses for robot learning"
+message: "If you use this software or its dataset audit results, please cite it."
+type: software
+authors:
+  - given-names: Tarek
+    family-names: Okasha
+repository-code: "https://github.com/tarekokasha22/mizan-kit"
+license: Apache-2.0
+version: 0.2.0
+date-released: "2026-09-09"
+keywords:
+  - robotics
+  - robot learning
+  - LeRobot
+  - dataset quality
+  - anytime-valid inference
+  - confidence sequences
+abstract: >-
+  Three components of the MIZAN research programme. cairo_protocol provides
+  anytime-valid confidence sequences and fixed-n tests so that a robot trial
+  is analysed correctly from the first trial onward. ledger is a temporal
+  integrity audit for LeRobot datasets on the Hugging Face Hub, run as a two
+  tier census that surveys dataset metadata across the whole population and
+  runs per frame checks over a seeded random sample, reporting prevalence
+  with confidence intervals. lerobot_ur is a Universal Robots e-Series
+  follower over RTDE with a simulator based CI gate.
