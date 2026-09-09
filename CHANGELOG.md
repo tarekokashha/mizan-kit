@@ -8,6 +8,18 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- A census output directory is now locked for the duration of a run.
+  Found by running the tool for real: a first run was launched, believed
+  dead, and a second started against the same out-dir. Both were alive, both
+  appended, and the ledger ended up with 438 records for 223 datasets, 215 of
+  them written twice, with nothing complaining. For a job built to run
+  unattended for hours and resume after a crash, that is the obvious
+  operator mistake, and a silently doubled ledger is worse than a crash
+  because it still looks like data. The lock is an O_EXCL file, so acquiring
+  it is atomic. A crashed run leaves its lock behind deliberately; clearing
+  it is `--force-unlock`, an operator decision, never something the code
+  guesses at by reading a timestamp and deciding a run looks old enough to
+  be dead.
 - The quick audit workflow (`--top`, `--repos`) had no test coverage at all
   and carried three defects the census path had already been fixed for.
   `tests/test_audit_legacy.py` adds 17 offline tests and pins all three.

@@ -42,8 +42,11 @@ judgement recorded on DatasetReport.confirmed, per ledger.report.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -62,6 +65,55 @@ class CensusConfig:
     files_per_dataset: int | None = 1  # None means every file ("--files all")
     max_datasets: int | None = None
     tier: str = "both"
+
+
+class CensusLockError(RuntimeError):
+    """Another census run owns this output directory."""
+
+
+@contextlib.contextmanager
+def census_lock(out_dir, force: bool = False):
+    """Hold an exclusive lock on a census output directory.
+
+    A census appends to its ledger for hours and is built to be resumable,
+    so two runs sharing one out_dir is not an exotic accident. It is the
+    obvious operator mistake: start a run, believe it died, start another.
+    Without a lock both processes append and the ledger silently doubles.
+    That was observed in practice during the first live run of this tool,
+    438 records for 223 datasets, and a doubled ledger is worse than a
+    crash because it still looks like data.
+
+    The lock is a file created with O_EXCL, so acquiring it is atomic. A
+    crashed run leaves its lock behind deliberately. Clearing it is the
+    operator's decision, taken with force=True, never something this code
+    guesses at by reading a timestamp and deciding a run looks old enough
+    to be dead.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / ".census.lock"
+    if force:
+        with contextlib.suppress(OSError):
+            path.unlink()
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        held = ""
+        with contextlib.suppress(OSError):
+            held = path.read_text(encoding="utf-8").strip()
+        raise CensusLockError(
+            f"a census is already running against {out_dir} "
+            f"({held or 'no holder recorded'}). Two runs appending to one "
+            f"ledger duplicate every record. If that run is dead, delete "
+            f"{path} or pass force to break the lock."
+        ) from None
+    try:
+        os.write(fd, f"pid={os.getpid()} started={time.time():.0f}".encode())
+        os.close(fd)
+        yield path
+    finally:
+        with contextlib.suppress(OSError):
+            path.unlink()
 
 
 def _key(repo: str, revision: str = "") -> str:
@@ -285,7 +337,12 @@ TIERS = ("metadata", "deep", "both")
 
 
 def run_census(
-    repos: list[str], source, cfg: CensusConfig, out_dir=None, resume: bool = False
+    repos: list[str],
+    source,
+    cfg: CensusConfig,
+    out_dir=None,
+    resume: bool = False,
+    force_unlock: bool = False,
 ) -> int:
     """Single entry point for the two tier census: cfg.tier is the only
     switch that decides which tiers run.
@@ -315,18 +372,21 @@ def run_census(
         raise ValueError(f"unknown census tier {cfg.tier!r}, expected one of {TIERS}")
     out_dir = Path(out_dir) if out_dir is not None else Path(cfg.out_dir)
     written = 0
-    if cfg.tier in ("metadata", "both"):
-        meta_path = out_dir / "metadata.jsonl"
-        done = load_done(meta_path) if resume else set()
-        n = run_metadata_tier(repos, source, meta_path, done=done)
-        written += n
-        print(f"metadata tier: {n} record(s) -> {meta_path}", file=sys.stderr)
-    if cfg.tier in ("deep", "both"):
-        deep_path = out_dir / "deep.jsonl"
-        done = load_done(deep_path) if resume else set()
-        n = run_deep_tier(repos, source, cfg, deep_path, done=done)
-        written += n
-        print(f"deep tier: {n} record(s) -> {deep_path}", file=sys.stderr)
+    # Held for the whole run, both tiers. Two runs appending to one ledger
+    # duplicate every record and nothing downstream can tell afterwards.
+    with census_lock(out_dir, force=force_unlock):
+        if cfg.tier in ("metadata", "both"):
+            meta_path = out_dir / "metadata.jsonl"
+            done = load_done(meta_path) if resume else set()
+            n = run_metadata_tier(repos, source, meta_path, done=done)
+            written += n
+            print(f"metadata tier: {n} record(s) -> {meta_path}", file=sys.stderr)
+        if cfg.tier in ("deep", "both"):
+            deep_path = out_dir / "deep.jsonl"
+            done = load_done(deep_path) if resume else set()
+            n = run_deep_tier(repos, source, cfg, deep_path, done=done)
+            written += n
+            print(f"deep tier: {n} record(s) -> {deep_path}", file=sys.stderr)
     return written
 
 

@@ -352,7 +352,9 @@ def run_census(args) -> int:
         tier=args.census,
     )
 
-    written = run_census_tiers(sample, source, cfg, out_dir=out_dir, resume=args.resume)
+    written = run_census_tiers(
+        sample, source, cfg, out_dir=out_dir, resume=args.resume, force_unlock=args.force_unlock
+    )
 
     print(f"census: {written} record(s) written under {out_dir}")
     return 0
@@ -466,6 +468,15 @@ def main(argv=None) -> int:
     census.add_argument("--seed", type=int, default=20260905, help="seed for the sample draw")
     census.add_argument(
         "--resume", action="store_true", help="skip repos already recorded under --out-dir"
+    )
+    census.add_argument(
+        "--force-unlock",
+        action="store_true",
+        help=(
+            "break a stale census lock on --out-dir. A crashed run leaves its lock "
+            "behind on purpose, because two runs sharing an out-dir append to the "
+            "same ledger and duplicate every record"
+        ),
     )
     census.add_argument(
         "--out-dir",
