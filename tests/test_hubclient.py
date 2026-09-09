@@ -1,6 +1,6 @@
 import json
 import pytest
-from ledger.hubclient import HubClient, RateLimited
+from ledger.hubclient import HubClient, RateLimited, _next_link
 
 
 class FakeResp:
@@ -95,6 +95,50 @@ def test_pagination_follows_link_header(monkeypatch):
     c = HubClient(min_interval=0.0)
     monkeypatch.setattr(c, "_open", lambda req, timeout=None: next(seq))
     assert [d["id"] for d in c.iter_datasets()] == ["a", "b"]
+
+
+# --------------------------------------------------------------------------- #
+# MINOR 5: a Link header can carry more than one relation, comma
+# separated. Checking whether rel="next" appears anywhere in the whole
+# header and then always taking the first ";"-segment picks whichever
+# relation happens to come first, not necessarily "next".
+# --------------------------------------------------------------------------- #
+def test_next_link_picks_the_next_relation_when_prev_comes_first():
+    header = '<https://example/p0>; rel="prev", <https://example/p2>; rel="next"'
+    assert _next_link(header) == "https://example/p2"
+
+
+def test_next_link_still_works_with_only_one_relation():
+    assert _next_link('<https://example/p2>; rel="next"') == "https://example/p2"
+
+
+def test_next_link_returns_none_when_there_is_no_next_relation():
+    assert _next_link('<https://example/p0>; rel="prev"') is None
+
+
+def test_next_link_returns_none_for_an_absent_header():
+    assert _next_link(None) is None
+    assert _next_link("") is None
+
+
+def test_pagination_requests_the_next_url_not_a_different_relation(monkeypatch):
+    # End to end: with prev before next in the header, the URL actually
+    # requested for the second page must be the next relation's URL, not
+    # the first relation to appear in the header.
+    requested = []
+
+    def opener(req, timeout=None):
+        requested.append(req.full_url)
+        if len(requested) == 1:
+            return FakeResp([{"id": "a"}],
+                            {"Link": '<https://example/prev>; rel="prev", '
+                                     '<https://example/p2>; rel="next"'})
+        return FakeResp([{"id": "b"}], {})
+
+    c = HubClient(min_interval=0.0)
+    monkeypatch.setattr(c, "_open", opener)
+    assert [d["id"] for d in c.iter_datasets()] == ["a", "b"]
+    assert requested[1] == "https://example/p2"
 
 
 def test_authorization_header_reaches_request(monkeypatch):

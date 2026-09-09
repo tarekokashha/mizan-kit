@@ -18,6 +18,26 @@ API = "https://huggingface.co/api"
 RESOLVE = "https://huggingface.co/datasets/{repo}/resolve/main/meta/info.json"
 
 
+def _next_link(link: str | None) -> str | None:
+    """The URL of the rel="next" relation in a Link header, or None.
+
+    A Link header can carry more than one relation, comma separated,
+    each its own "<url>; rel=\"...\"" segment (RFC 8288). Checking
+    whether rel="next" appears anywhere in the whole header and then
+    always taking the URL from the first ";"-separated segment (the old
+    approach) picks whichever relation happens to come first once more
+    than one is present, not necessarily "next". Splitting on "," first
+    isolates each relation into its own segment, so the right one is
+    found regardless of order.
+    """
+    if not link:
+        return None
+    for segment in link.split(","):
+        if 'rel="next"' in segment:
+            return segment.split(";")[0].strip().strip("<> ")
+    return None
+
+
 class RateLimited(RuntimeError):
     pass
 
@@ -162,6 +182,4 @@ class HubClient:
                 link = r.headers.get("Link") if r.headers else None
             yield from body
             pages += 1
-            url = None
-            if link and 'rel="next"' in link:
-                url = link.split(";")[0].strip("<> ")
+            url = _next_link(link)
