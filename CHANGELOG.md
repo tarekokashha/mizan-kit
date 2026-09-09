@@ -93,5 +93,5 @@ Initial kit.
 - `protocols/PROTOCOL_TEMPLATE.md`: the pre-registration file a programme
   commits before its first trial.
 
-[0.2.0]: https://github.com/tarekokasha22/mizan-kit/releases/tag/v0.2.0
-[0.1.0]: https://github.com/tarekokasha22/mizan-kit/releases/tag/v0.1.0
+[0.2.0]: https://github.com/tarekokashha/mizan-kit/releases/tag/v0.2.0
+[0.1.0]: https://github.com/tarekokashha/mizan-kit/releases/tag/v0.1.0

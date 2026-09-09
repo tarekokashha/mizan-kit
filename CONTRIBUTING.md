@@ -8,7 +8,7 @@ improvement.
 ## Setup
 
 ```bash
-git clone https://github.com/tarekokasha22/mizan-kit
+git clone https://github.com/tarekokashha/mizan-kit
 cd mizan-kit
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"        # Windows: .venv\Scripts\pip

@@ -8,7 +8,7 @@ Analyse the first trial you ever run correctly. Find out what is wrong with a
 robot dataset before you train on it. Run hardware in the loop CI with no arm
 in the room.
 
-[![tests](https://github.com/tarekokasha22/mizan-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/tarekokasha22/mizan-kit/actions/workflows/tests.yml)
+[![tests](https://github.com/tarekokashha/mizan-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/tarekokashha/mizan-kit/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![tests count](https://img.shields.io/badge/tests-148%20%2B%2017%20doctests-brightgreen)](tests/)

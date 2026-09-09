@@ -44,9 +44,9 @@ dev = ["mizan-kit[test]", "ruff>=0.6"]
 mizan-audit = "ledger.audit:main"
 
 [project.urls]
-Homepage = "https://github.com/tarekokasha22/mizan-kit"
-Repository = "https://github.com/tarekokasha22/mizan-kit"
-Issues = "https://github.com/tarekokasha22/mizan-kit/issues"
+Homepage = "https://github.com/tarekokashha/mizan-kit"
+Repository = "https://github.com/tarekokashha/mizan-kit"
+Issues = "https://github.com/tarekokashha/mizan-kit/issues"
 
 [tool.setuptools]
 packages = ["cairo_protocol", "ledger", "lerobot_ur"]
