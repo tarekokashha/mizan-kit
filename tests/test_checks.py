@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from ledger.checks import (
     REGISTRY, AGGREGATE_FLAGS, EpisodeStats, run_checks, episode_stats,
@@ -76,3 +77,43 @@ def test_frame_gap_is_quiet_on_consecutive_frames():
     s = EpisodeStats(n_frames=3, fps=30.0, ts=np.array([0.0, 0.033, 0.066]),
                      frame_index=np.array([0, 1, 2]), action=None, state=None)
     assert frame_gap(s) == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# IMPORTANT 4: a ragged or wrong-dtype action/state column must be visibly
+# distinguished from a column that was never there, not silently collapsed
+# to the same "no data" None every downstream check already treats as nan.
+# --------------------------------------------------------------------------- #
+def test_episode_stats_records_a_stack_error_for_a_ragged_action_column():
+    ep = pd.DataFrame({
+        "timestamp": [0.0, 0.033, 0.066],
+        "frame_index": [0, 1, 2],
+        "action": [[0.0, 1.0], [0.0, 1.0, 2.0], [0.0]],  # ragged: differing lengths
+        "observation.state": [[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]],
+    })
+    stats = episode_stats(ep, fps=30.0)
+    assert stats.action is None
+    assert stats.stack_error is True
+
+
+def test_episode_stats_has_no_stack_error_when_the_column_is_simply_absent():
+    ep = pd.DataFrame({
+        "timestamp": [0.0, 0.033, 0.066],
+        "frame_index": [0, 1, 2],
+    })
+    stats = episode_stats(ep, fps=30.0)
+    assert stats.action is None
+    assert stats.state is None
+    assert stats.stack_error is False
+
+
+def test_episode_stats_has_no_stack_error_on_a_clean_episode():
+    ep = pd.DataFrame({
+        "timestamp": [0.0, 0.033, 0.066],
+        "frame_index": [0, 1, 2],
+        "action": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
+        "observation.state": [[0.0, 1.0], [0.1, 1.0], [0.2, 1.0]],
+    })
+    stats = episode_stats(ep, fps=30.0)
+    assert stats.action is not None
+    assert stats.stack_error is False

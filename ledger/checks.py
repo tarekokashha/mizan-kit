@@ -66,22 +66,55 @@ class EpisodeStats:
     frame_index: np.ndarray | None
     action: np.ndarray | None
     state: np.ndarray | None
+    # IMPORTANT 4: True when "action" or "observation.state" was present
+    # on this episode but could not be stacked into a (T, D) array (a
+    # ragged column, a wrong dtype, or a stack that came out with the
+    # wrong number of dimensions). episode_stats sets this only when the
+    # column existed and _stack failed on it, never for a column that
+    # was simply absent, so a caller can tell the two apart instead of
+    # both collapsing to the same action/state=None every downstream
+    # check already reports as nan.
+    stack_error: bool = False
 
 
 def _stack(col) -> np.ndarray | None:
+    """Stack a column of per-frame vectors into one (T, D) array.
+
+    Only ValueError and TypeError are caught: a ragged column (frames of
+    differing length) raises ValueError from np.stack itself, and a
+    value np.asarray(..., dtype=float64) cannot convert raises
+    TypeError or ValueError from the conversion. Anything else
+    propagates rather than being swallowed here, so a genuine bug
+    elsewhere cannot silently masquerade as "no data". Returns None on
+    a caught failure or when the stack does not come out 2D, exactly as
+    before; episode_stats is what turns that into a visible, counted
+    signal (stack_error) rather than treating it the same as a column
+    that was never there.
+    """
     try:
         arr = np.stack([np.asarray(v, dtype=np.float64) for v in col])
-        return arr if arr.ndim == 2 else None
-    except Exception:
+    except (ValueError, TypeError):
         return None
+    return arr if arr.ndim == 2 else None
 
 
 def episode_stats(ep, fps: float) -> EpisodeStats:
     ts = np.asarray(ep["timestamp"], dtype=np.float64) if "timestamp" in ep else None
     fi = np.asarray(ep["frame_index"], dtype=np.int64) if "frame_index" in ep else None
-    ac = _stack(ep["action"]) if "action" in ep else None
-    st = _stack(ep["observation.state"]) if "observation.state" in ep else None
-    return EpisodeStats(len(ep), fps, ts, fi, ac, st)
+    stack_error = False
+    if "action" in ep:
+        ac = _stack(ep["action"])
+        if ac is None:
+            stack_error = True
+    else:
+        ac = None
+    if "observation.state" in ep:
+        st = _stack(ep["observation.state"])
+        if st is None:
+            stack_error = True
+    else:
+        st = None
+    return EpisodeStats(len(ep), fps, ts, fi, ac, st, stack_error)
 
 
 def xcorr_lag(action, state, lags: Iterable[int] = LAGS):

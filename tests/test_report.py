@@ -51,6 +51,28 @@ def test_confirmed_defaults_empty():
     assert _rep("identity").confirmed == ""
 
 
+def test_audit_frame_counts_stack_errors_for_a_ragged_column():
+    # IMPORTANT 4: audit_frame's returned counts dict must carry a
+    # visible count of episodes whose action/state column existed but
+    # could not be stacked, not fold that into the same "no data" nan
+    # every check already reports for a column that was simply absent.
+    df = make_episodes(defect="", seed=0, n_eps=1, T=10)
+    df.at[0, "action"] = df.at[0, "action"][:-1]  # ragged: one short row
+    result = audit_frame(df, 30.0)
+    assert result["stack_errors"] == 1
+
+
+def test_summarise_carries_stack_errors_onto_the_report():
+    df = make_episodes(defect="", seed=0, n_eps=1, T=10)
+    df.at[0, "action"] = df.at[0, "action"][:-1]
+    rep = summarise("t", {"fps": 30}, [audit_frame(df, 30.0)])
+    assert rep.stack_errors == 1
+
+
+def test_summarise_stack_errors_defaults_to_zero_on_clean_data():
+    assert _rep("").stack_errors == 0
+
+
 def test_audit_frame_returns_a_single_counts_dict():
     # RULING 2: audit_frame(df, fps) -> dict, matching ledger.audit
     # exactly, not a list of per-episode dicts. A refactor that quietly
