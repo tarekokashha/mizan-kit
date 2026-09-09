@@ -59,6 +59,24 @@ def test_load_done_skips_a_truncated_final_line(tmp_path):
     assert load_done(p) == {"acme/x@abc"}
 
 
+def test_load_done_excludes_rate_limited_records_so_resume_retries_them(tmp_path):
+    # CRITICAL 2: an exhausted-backoff 429 is recorded with an error, but
+    # it is not genuinely done the way a successful record or a real
+    # 401/403/404 is. --resume must see it as still outstanding.
+    p = tmp_path / "ledger.jsonl"
+    rows = [
+        {"repo": "acme/ok", "revision": "r1", "error": ""},
+        {"repo": "acme/missing", "revision": "", "error": "no info.json"},
+        {"repo": "acme/busy", "revision": "",
+         "error": "RateLimited: gave up on https://x after 5 attempts: 429"},
+    ]
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    done = load_done(p)
+    assert "acme/ok@r1" in done
+    assert "acme/missing@" in done
+    assert "acme/busy@" not in done
+
+
 def test_deep_tier_writes_one_record_per_dataset(tmp_path):
     root = tmp_path / "repos"
     for name in ["acme/a", "acme/b"]:
@@ -168,6 +186,34 @@ def test_metadata_tier_tolerates_a_missing_metadata_key(tmp_path):
     assert not rows[0]["error"]
     assert rows[0]["total_frames"] == 0  # dataclass default, not a raise
     assert rows[0]["total_episodes"] == 1  # the key that *was* present
+
+
+def test_metadata_tier_records_a_distinguishable_error_when_the_hub_rate_limits(monkeypatch, tmp_path):
+    # CRITICAL 2 end to end, through the real HubClient with only _open
+    # monkeypatched (no network touched): before the fix, get_info
+    # swallowed RateLimited to None and this landed here as the same
+    # "no info.json" a genuine 401/403/404 gets, so --resume could never
+    # tell the two apart. It must now be distinguishable.
+    import urllib.error
+
+    from ledger.hubclient import HubClient
+    from ledger.sources import StreamingSource
+
+    def opener(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 429, "rate", {"Retry-After": "0"}, None)
+
+    client = HubClient(min_interval=0.0, max_retries=2)
+    monkeypatch.setattr(client, "_open", opener)
+    source = StreamingSource(client=client)
+    out = tmp_path / "meta.jsonl"
+
+    n = run_metadata_tier(["acme/busy"], source, out)
+
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert rows[0]["error"]
+    assert rows[0]["error"] != "no info.json"
+    assert "RateLimited" in rows[0]["error"]
 
 
 def test_metadata_tier_records_unknown_layout_family_without_failing_the_dataset(tmp_path):

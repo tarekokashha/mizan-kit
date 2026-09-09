@@ -50,6 +50,36 @@ def test_missing_info_returns_none(monkeypatch):
     assert c.get_info("acme/missing") is None
 
 
+# --------------------------------------------------------------------------- #
+# CRITICAL 2: an exhausted-backoff 429 must never look like a genuine
+# 401/403/404. get_info used to catch RateLimited and return None, making
+# the two indistinguishable to a caller; that swallowing is the bug.
+# --------------------------------------------------------------------------- #
+def test_get_info_propagates_rate_limited_instead_of_returning_none(monkeypatch):
+    import urllib.error
+
+    def opener(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 429, "rate", {"Retry-After": "0"}, None)
+
+    c = HubClient(min_interval=0.0, max_retries=2)
+    monkeypatch.setattr(c, "_open", opener)
+    with pytest.raises(RateLimited):
+        c.get_info("acme/busy")
+
+
+def test_get_info_still_returns_none_for_a_genuine_404(monkeypatch):
+    # The fix must not widen to swallow real absence too: 401/403/404
+    # stay a clean None, only RateLimited must now propagate.
+    import urllib.error
+
+    def opener(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 403, "gated", {}, None)
+
+    c = HubClient(min_interval=0.0)
+    monkeypatch.setattr(c, "_open", opener)
+    assert c.get_info("acme/gated") is None
+
+
 def test_token_is_never_in_repr():
     c = HubClient(token="hf_secretvalue")
     assert "hf_secretvalue" not in repr(c)

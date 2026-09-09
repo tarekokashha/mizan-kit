@@ -99,6 +99,18 @@ def draw_sample(frame: list[str], size: int, seed: int) -> list[str]:
     return [ordered[i] for i in idx]
 
 
+def _is_rate_limited_error(error: str) -> bool:
+    """True when a record's error field was produced by a propagated
+    ledger.hubclient.RateLimited (CRITICAL 2).
+
+    Both tier runners record every exception as f"{type(e).__name__}: {e}"
+    (run_metadata_tier, run_deep_tier), so the exception class's own name
+    is a stable, distinguishing marker: a genuine 401/403/404 is recorded
+    as "no info.json" or "no info.json for <repo>", never this.
+    """
+    return error.startswith("RateLimited:")
+
+
 def load_done(path) -> set[str]:
     """Read a JSONL ledger and return the repo@revision keys already
     written, so a re-run can skip them.
@@ -106,6 +118,13 @@ def load_done(path) -> set[str]:
     A truncated final line, exactly what a crash mid write leaves
     behind, is skipped rather than raised on: a crash at dataset N
     costs one dataset, not the run.
+
+    CRITICAL 2: a record whose error indicates an exhausted-backoff rate
+    limit is excluded from the returned set, even though it was written
+    to the ledger. That is not genuinely done work the way a success or
+    a real 401/403/404 is; it is the one failure mode this whole client
+    exists to survive, so a later --resume run must retry it rather than
+    treat the exhausted backoff as permanent.
     """
     path = Path(path)
     done: set[str] = set()
@@ -119,6 +138,8 @@ def load_done(path) -> set[str]:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
+                continue
+            if _is_rate_limited_error(row.get("error", "")):
                 continue
             done.add(_key(row.get("repo", ""), row.get("revision", "")))
     return done

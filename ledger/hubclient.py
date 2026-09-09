@@ -119,6 +119,18 @@ class HubClient:
             return json.loads(r.read())
 
     def get_info(self, repo: str) -> dict | None:
+        """The parsed meta/info.json for repo, or None if it genuinely
+        is not there.
+
+        None means a genuine 401, 403 or 404: gated, private, or missing.
+        An exhausted backoff (RateLimited, see _raw) is a different
+        situation entirely, not indistinguishable absence, so it is left
+        to propagate rather than being caught here and folded into the
+        same None a caller cannot tell apart from real absence. A
+        malformed JSON body (json.JSONDecodeError) still returns None:
+        that is a genuine response the Hub actually sent, not a retry
+        exhaustion.
+        """
         try:
             with self._raw(RESOLVE.format(repo=repo)) as r:
                 self._revisions[repo] = _extract_revision(r)
@@ -127,7 +139,7 @@ class HubClient:
             if e.code in (401, 403, 404):
                 return None
             raise
-        except (RateLimited, json.JSONDecodeError):
+        except json.JSONDecodeError:
             return None
 
     def get_revision(self, repo: str) -> str:
