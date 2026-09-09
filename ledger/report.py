@@ -92,6 +92,17 @@ class DatasetReport:
     source: str = ""
     revision: str = ""
     error: str = ""
+    # Tier 1 metadata fields (ledger.census.run_metadata_tier), read from
+    # meta/info.json: episode and frame counts, chunk size, layout family
+    # (ledger.paths.layout_family) and a compact feature schema. Additive:
+    # a deep tier report leaves these at their defaults, since
+    # run_deep_tier/summarise() do not populate them.
+    total_episodes: int = 0
+    total_frames: int = 0
+    chunk_size: int = 0
+    layout_family: str = ""
+    feature_names: str = ""
+    n_features: int = 0
 
 
 def audit_frame(df, fps: float) -> dict:

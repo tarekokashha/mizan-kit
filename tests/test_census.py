@@ -124,9 +124,17 @@ def test_deep_tier_resume_skips_repos_already_in_done(tmp_path):
 
 
 def test_metadata_tier_writes_one_record_per_dataset(tmp_path):
+    # CRITICAL 1: tier 1 is sold (README, design doc section 3) as
+    # recording codebase version, fps, episode and frame counts, chunk
+    # size, feature schema and layout family. Every one of those fields
+    # must actually land on the record, not just codebase/fps/source.
     root = tmp_path / "repos"
     for name in ["acme/a", "acme/b"]:
         write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, name)
+        info_path = root / name / "meta/info.json"
+        info = json.loads(info_path.read_text())
+        info["features"] = {"action": {}, "observation.state": {}, "timestamp": {}}
+        info_path.write_text(json.dumps(info))
     out = tmp_path / "meta.jsonl"
     n = run_metadata_tier(["acme/a", "acme/b"], LocalSource(root), out)
     assert n == 2
@@ -134,6 +142,52 @@ def test_metadata_tier_writes_one_record_per_dataset(tmp_path):
     assert [r["repo"] for r in rows] == ["acme/a", "acme/b"]
     assert all(r["codebase"] == "v3.0" for r in rows)
     assert all(not r["error"] for r in rows)
+    for r in rows:
+        assert r["total_episodes"] == 1
+        assert r["total_frames"] == 40
+        assert r["chunk_size"] == 1000
+        assert r["layout_family"] == "packed"
+        assert r["feature_names"] == "action;observation.state;timestamp"
+        assert r["n_features"] == 3
+
+
+def test_metadata_tier_tolerates_a_missing_metadata_key(tmp_path):
+    # A repo whose info.json is missing one of the newly added keys must
+    # still get a record, with that field left at its dataclass default
+    # rather than raising and losing the whole record.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    info_path = root / "acme/a/meta/info.json"
+    info = json.loads(info_path.read_text())
+    del info["total_frames"]  # simulate a key the Hub happens not to carry
+    info_path.write_text(json.dumps(info))
+    out = tmp_path / "meta.jsonl"
+    n = run_metadata_tier(["acme/a"], LocalSource(root), out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert not rows[0]["error"]
+    assert rows[0]["total_frames"] == 0  # dataclass default, not a raise
+    assert rows[0]["total_episodes"] == 1  # the key that *was* present
+
+
+def test_metadata_tier_records_unknown_layout_family_without_failing_the_dataset(tmp_path):
+    # An unrecognised data_path template makes ledger.paths.layout_family
+    # raise ValueError. That must degrade to layout_family="unknown", not
+    # to a failed dataset: every other field info.json can supply should
+    # still land on the record, and error must stay empty.
+    root = tmp_path / "repos"
+    write_v30_fixture(make_episodes(n_eps=1, T=40, seed=1), root, "acme/a")
+    info_path = root / "acme/a/meta/info.json"
+    info = json.loads(info_path.read_text())
+    info["data_path"] = "weird/{nope}.parquet"
+    info_path.write_text(json.dumps(info))
+    out = tmp_path / "meta.jsonl"
+    n = run_metadata_tier(["acme/a"], LocalSource(root), out)
+    assert n == 1
+    rows = [json.loads(l) for l in out.read_text().strip().splitlines()]
+    assert not rows[0]["error"]
+    assert rows[0]["layout_family"] == "unknown"
+    assert rows[0]["total_episodes"] == 1  # rest of the record is unaffected
 
 
 def test_metadata_tier_records_error_for_missing_info(tmp_path):

@@ -1,8 +1,8 @@
 # LEDGER M-02 automated audit. Flags are provisional measurements, not findings. No dataset should be treated as having a confirmed problem until a human has opened it and filled in the confirmed column.
-repo,codebase,fps,episodes_sampled,frames_sampled,ts_nonmonotonic_eps,frac_bad_dt,dt_jitter_ratio,frame_gap_eps,stuck_state_frac,identity_frac,lag_frames,r_lag0,r_best,dup_episode_frac,flags,note,confirmed,source,revision,error
-synthetic/clean,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,2.0,0.9672949283038665,0.9913175890895616,0.0,,,,,,
-synthetic/identity,demo,30.0,6,1800,0,0.0,0.0,0,0.0,1.0,0.0,0.9999999830752864,0.9999999830752864,0.0,action_equals_state,,,,,
-synthetic/drops,demo,30.0,6,1689,0,0.05525846702317291,0.0,0,0.0,0.0,2.0,0.9672115920519581,0.9890299713041618,0.0,bad_dt,,,,,
-synthetic/stuck,demo,30.0,6,1800,0,0.0,0.0,0,0.2491638795986622,0.0,2.0,0.8402618734434338,0.8588718532125501,0.0,stuck_state,,,,,
-synthetic/swapped,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,-2.0,0.9672949283038665,0.9913175890895616,0.0,negative_lag,,,,,
-synthetic/duplicate,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,6.0,0.04758178246549403,0.07918300927015062,0.8333333333333334,large_lag|duplicate_episodes,,,,,
+repo,codebase,fps,episodes_sampled,frames_sampled,ts_nonmonotonic_eps,frac_bad_dt,dt_jitter_ratio,frame_gap_eps,stuck_state_frac,identity_frac,lag_frames,r_lag0,r_best,dup_episode_frac,flags,note,confirmed,source,revision,error,total_episodes,total_frames,chunk_size,layout_family,feature_names,n_features
+synthetic/clean,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,2.0,0.9672949283038665,0.9913175890895616,0.0,,,,,,,0,0,0,,,0
+synthetic/identity,demo,30.0,6,1800,0,0.0,0.0,0,0.0,1.0,0.0,0.9999999830752864,0.9999999830752864,0.0,action_equals_state,,,,,,0,0,0,,,0
+synthetic/drops,demo,30.0,6,1689,0,0.05525846702317291,0.0,0,0.0,0.0,2.0,0.9672115920519581,0.9890299713041618,0.0,bad_dt,,,,,,0,0,0,,,0
+synthetic/stuck,demo,30.0,6,1800,0,0.0,0.0,0,0.2491638795986622,0.0,2.0,0.8402618734434338,0.8588718532125501,0.0,stuck_state,,,,,,0,0,0,,,0
+synthetic/swapped,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,-2.0,0.9672949283038665,0.9913175890895616,0.0,negative_lag,,,,,,0,0,0,,,0
+synthetic/duplicate,demo,30.0,6,1800,0,0.0,0.0,0,0.0,0.0,6.0,0.04758178246549403,0.07918300927015062,0.8333333333333334,large_lag|duplicate_episodes,,,,,,0,0,0,,,0

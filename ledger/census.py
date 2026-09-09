@@ -49,6 +49,7 @@ from pathlib import Path
 import numpy as np
 
 from cairo_protocol.stats import wilson_interval
+from ledger.paths import layout_family
 from ledger.report import DatasetReport, append_jsonl, audit_frame, summarise
 
 
@@ -144,6 +145,19 @@ def run_metadata_tier(repos: list[str], source, out_path, done: set[str] | None 
     every source that can supply one. A source with no revision method,
     LocalSource and SyntheticSource among them, behaves exactly as
     before: the key stays repo@.
+
+    CRITICAL 1: a record also carries total_episodes, total_frames,
+    chunk_size, layout_family and a compact feature schema
+    (feature_names, the sorted feature keys joined by ";", plus
+    n_features), the fields the metadata tier has always been documented
+    to record (design doc section 3, README). Each is read from info
+    with .get(key, default), so a key info.json happens not to carry
+    leaves that one field at its DatasetReport default rather than
+    raising; the rest of the record is unaffected. layout_family comes
+    from ledger.paths.layout_family, which raises ValueError on a
+    data_path template it does not recognise; that is caught locally and
+    recorded as "unknown" rather than being allowed to fail the whole
+    dataset the way letting it propagate to the broad except below would.
     """
     done = done if done is not None else set()
     get_revision = getattr(source, "revision", None)
@@ -160,6 +174,18 @@ def run_metadata_tier(repos: list[str], source, out_path, done: set[str] | None 
             else:
                 rep.codebase = str(info.get("codebase_version", ""))
                 rep.fps = float(info.get("fps", float("nan")))
+                rep.total_episodes = int(info.get("total_episodes", 0) or 0)
+                rep.total_frames = int(info.get("total_frames", 0) or 0)
+                rep.chunk_size = int(info.get("chunks_size", 0) or 0)
+                features = info.get("features")
+                if isinstance(features, dict) and features:
+                    names = sorted(features.keys())
+                    rep.feature_names = ";".join(names)
+                    rep.n_features = len(names)
+                try:
+                    rep.layout_family = layout_family(info)
+                except ValueError:
+                    rep.layout_family = "unknown"
         except Exception as e:  # noqa: BLE001 - graceful degradation is the point
             rep.error = f"{type(e).__name__}: {e}"
         if get_revision:
