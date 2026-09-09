@@ -4,6 +4,38 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The quick audit workflow (`--top`, `--repos`) had no test coverage at all
+  and carried three defects the census path had already been fixed for.
+  `tests/test_audit_legacy.py` adds 17 offline tests and pins all three.
+  - `load_info` caught every exception and returned `None`, so a dataset
+    that was merely rate limited was reported as "no meta/info.json (gated,
+    missing, or not LeRobot)". A reader could not tell a throttled dataset
+    from an absent one. It now goes through `HubClient`, so it inherits the
+    backoff, and a `RateLimited` that outlives the retries propagates and is
+    recorded in the report's `error` field instead.
+  - `sample_parquet_paths` caught every exception from the tree listing and
+    returned an empty list, so a throttled repository produced a report that
+    read as a dataset audited and found to contain nothing. The tree endpoint
+    is the call measured getting throttled hardest. It now raises
+    `TreeListingError`, which `audit_repo` records as an error, and an empty
+    list once again means only that there was genuinely nothing to audit.
+  - `--files all` on the quick path was an unbounded download. `small[:None]`
+    returns every file, `hf_hub_download` caches permanently, and nothing
+    deleted anything, so a v2.x dataset with one parquet per episode would
+    fill the disk. The quick path now caps at 25 files, says so on stderr,
+    offers `--no-file-cap` to opt out, and deletes each file after reading
+    it. This footgun arrived with `--files all` in 0.2.0 and did not exist
+    in v0, whose `--files` was an int.
+  - `list_top` called urllib directly with no retry, so a single 429 ended
+    the run. It now goes through `HubClient` too.
+- The `no em dashes` CI gate matched a literal em dash, so the workflow file
+  containing the pattern tripped its own check and would have failed every
+  build. It now matches by codepoint.
+
 ## [0.2.0] - 2026-09-09
 
 The M-02 LEDGER release. The dataset audit becomes a resumable two tier

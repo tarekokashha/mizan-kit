@@ -59,10 +59,9 @@ ledger.report.PROVISIONAL_HEADER.
 from __future__ import annotations
 
 import argparse
-import json
+import contextlib
 import sys
 import time
-import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -75,7 +74,7 @@ from ledger.census import (
 from ledger.census import (
     run_census as run_census_tiers,
 )
-from ledger.hubclient import HubClient
+from ledger.hubclient import API, HubClient, RateLimited
 from ledger.report import DatasetReport, audit_frame, summarise, write_csv
 from ledger.sources import DownloadSource, LocalSource, StreamingSource
 
@@ -90,28 +89,64 @@ __all__ = ["main", "parse_files", "demo", "_synthetic", "audit_frame", "summaris
 # ledger/paths.py) because the tree endpoint is the one the anonymous
 # rate limit punishes hardest. All optional so --demo runs offline.
 # --------------------------------------------------------------------------- #
-def list_top(n: int) -> list[str]:
-    url = (
-        f"https://huggingface.co/api/datasets?filter=LeRobot&sort=downloads&direction=-1&limit={n}"
-    )
-    with urllib.request.urlopen(url, timeout=60) as r:
-        return [d["id"] for d in json.load(r)]
+class TreeListingError(RuntimeError):
+    """Listing a repository's data tree failed.
+
+    Distinct from a listing that genuinely returned no parquet. v0 caught
+    every exception here and returned an empty list, so a throttled repo
+    produced a report that read as a dataset which had been audited and
+    found to contain nothing. The tree endpoint is the call measured
+    getting throttled hardest, so that was not a rare path.
+    """
 
 
-def load_info(repo: str) -> dict | None:
-    url = f"https://huggingface.co/datasets/{repo}/resolve/main/meta/info.json"
-    try:
-        with urllib.request.urlopen(url, timeout=60) as r:
-            return json.load(r)
-    except Exception as e:  # gated, missing, or not a LeRobot dataset
-        print(f"  [skip] {repo}: {e}", file=sys.stderr)
-        return None
+# The quick audit downloads whole parquet files. --files all parses to
+# None, and a v2.0 dataset stores one parquet per episode: one real Hub
+# dataset has 209,880 of them. Without a bound, --files all fills the disk.
+# Lift it deliberately with --no-file-cap.
+QUICK_AUDIT_FILE_CAP = 25
 
 
-def sample_parquet_paths(repo: str, max_files: int | None, max_mb: float) -> list[str]:
+def _hf_api():
+    """The HfApi used for tree listing. Indirected so tests can replace it."""
     from huggingface_hub import HfApi
 
-    api = HfApi()
+    return HfApi()
+
+
+def list_top(n: int, client: HubClient | None = None) -> list[str]:
+    """The n most downloaded LeRobot datasets.
+
+    Goes through HubClient so it inherits Retry-After compliance and
+    backoff. v0 called urllib directly, so a single 429 ended the run.
+    """
+    client = client or HubClient()
+    url = f"{API}/datasets?filter=LeRobot&sort=downloads&direction=-1&limit={n}"
+    return [d["id"] for d in client.get_json(url)]
+
+
+def load_info(repo: str, client: HubClient | None = None) -> dict | None:
+    """The parsed meta/info.json for repo, or None if it is genuinely absent.
+
+    None means a genuine 401, 403 or 404. A rate limit that outlives the
+    backoff propagates as RateLimited rather than being folded into the
+    same None, because "we were throttled" and "this dataset is gated or
+    missing" are different facts and a human reading the report must be
+    able to tell them apart.
+    """
+    return (client or HubClient()).get_info(repo)
+
+
+def sample_parquet_paths(
+    repo: str, max_files: int | None, max_mb: float, cap: bool = True
+) -> list[str]:
+    """Parquet paths for the quick audit, smallest chunk first.
+
+    Raises TreeListingError if the listing itself failed. Returns an empty
+    list only when the listing succeeded and there was nothing to audit,
+    or when every file exceeds max_mb.
+    """
+    api = _hf_api()
     try:
         top = list(api.list_repo_tree(repo, repo_type="dataset", path_in_repo="data"))
         chunks = sorted(e.path for e in top if not e.path.endswith(".parquet"))
@@ -119,17 +154,27 @@ def sample_parquet_paths(repo: str, max_files: int | None, max_mb: float) -> lis
         if chunks:  # descend into the first chunk directory only; cheap on huge repos
             entries += list(api.list_repo_tree(repo, repo_type="dataset", path_in_repo=chunks[0]))
     except Exception as e:
-        print(f"  [skip] {repo}: cannot list tree ({e})", file=sys.stderr)
-        return []
+        raise TreeListingError(f"cannot list the data tree for {repo}: {e}") from e
     files = [(e.path, getattr(e, "size", 0) or 0) for e in entries if e.path.endswith(".parquet")]
     files.sort()  # chunk-000/file-000 (v3) or chunk-000/episode_000000 (v2.x) first
-    small = [p for p, s in files if s <= max_mb * 1e6]
-    if not small:
+    small = [p for p, size in files if size <= max_mb * 1e6]
+    if files and not small:
         print(
-            f"  [skip] {repo}: smallest parquet exceeds --max-mb {max_mb:.0f}; raise it or run in the overnight loop",
+            f"  [skip] {repo}: smallest parquet exceeds --max-mb {max_mb:.0f}; "
+            f"raise it or run the census instead",
             file=sys.stderr,
         )
         return []
+    if max_files is None:
+        if cap and len(small) > QUICK_AUDIT_FILE_CAP:
+            print(
+                f"  [cap] {repo}: {len(small)} parquet files, auditing the first "
+                f"{QUICK_AUDIT_FILE_CAP}. Pass --no-file-cap to audit every one, "
+                f"or use the census for a whole population survey.",
+                file=sys.stderr,
+            )
+            return small[:QUICK_AUDIT_FILE_CAP]
+        return small
     return small[:max_files]
 
 
@@ -145,20 +190,39 @@ def read_table(local_path: str):
     return pq.read_table(local_path).to_pandas()
 
 
-def audit_repo(repo: str, max_files: int | None, max_mb: float) -> DatasetReport:
-    info = load_info(repo)
+def audit_repo(repo: str, max_files: int | None, max_mb: float, cap: bool = True) -> DatasetReport:
+    """Audit one named dataset the quick way, by downloading its parquet.
+
+    Every failure is recorded on the report rather than raised, so one bad
+    repository cannot end a run over many. A rate limit and a failed tree
+    listing are recorded in `error`, which keeps them distinguishable from
+    the `note` a genuinely absent dataset gets.
+    """
+    try:
+        info = load_info(repo)
+    except RateLimited as e:
+        return DatasetReport(repo=repo, error=f"RateLimited: {e}")
     if info is None:
         return DatasetReport(repo=repo, note="no meta/info.json (gated, missing, or not LeRobot)")
     fps = float(info.get("fps", 0) or 0)
-    paths = sample_parquet_paths(repo, max_files, max_mb)
+    try:
+        paths = sample_parquet_paths(repo, max_files, max_mb, cap=cap)
+    except TreeListingError as e:
+        return DatasetReport(repo=repo, error=f"TreeListingError: {e}")
     parts = []
-    for p in paths:
+    for path in paths:
+        local = None
         try:
-            local = download(repo, p)
-            df = read_table(local)
-            parts.append(audit_frame(df, fps))
+            local = download(repo, path)
+            parts.append(audit_frame(read_table(local), fps))
         except Exception as e:
-            print(f"  [warn] {repo}/{p}: {e}", file=sys.stderr)
+            print(f"  [warn] {repo}/{path}: {e}", file=sys.stderr)
+        finally:
+            # Best effort. v0 left every downloaded parquet in the cache
+            # forever, which is what made --files all a disk hazard.
+            if local:
+                with contextlib.suppress(OSError):
+                    Path(local).unlink()
     return summarise(repo, info, parts)
 
 
@@ -371,6 +435,16 @@ def main(argv=None) -> int:
         help="prefer parquet files under this size (quick workflow only)",
     )
     ap.add_argument(
+        "--no-file-cap",
+        action="store_true",
+        help=(
+            f"lift the quick audit's {QUICK_AUDIT_FILE_CAP} file ceiling. The quick "
+            "workflow downloads whole parquet files and a v2.x dataset stores one per "
+            "episode, so '--files all' without this is capped to protect the disk. "
+            "For a whole population survey use --census instead."
+        ),
+    )
+    ap.add_argument(
         "--out",
         type=str,
         default=None,
@@ -426,7 +500,7 @@ def main(argv=None) -> int:
     for i, repo in enumerate(repos, 1):
         t0 = time.time()
         print(f"[{i}/{len(repos)}] {repo}", file=sys.stderr)
-        reps.append(audit_repo(repo, args.files, args.max_mb))
+        reps.append(audit_repo(repo, args.files, args.max_mb, cap=not args.no_file_cap))
         print(
             f"      done in {time.time() - t0:.1f}s  flags={reps[-1].flags or '-'}", file=sys.stderr
         )

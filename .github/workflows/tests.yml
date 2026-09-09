@@ -62,7 +62,8 @@ jobs:
       - name: No em dashes in prose or code
         # CLAUDE.md: plain sentences, no em dashes anywhere.
         run: |
-          if git grep -n -- '—' -- . ':(exclude)docs/superpowers/*'; then
+          # Matched by codepoint so this file does not trip its own gate.
+          if git grep -nP '\x{2014}' -- . ':(exclude)docs/superpowers/*'; then
             echo "::error::em dash found; CLAUDE.md forbids them"
             exit 1
           fi

@@ -245,6 +245,12 @@ Stated plainly, because a kit that hides these is worse than no kit.
   sequential indices. A source that cannot answer an existence check falls
   back to sampling one file, and the report records that the audit was
   partial.
+- **`--files all` on the quick audit is capped.** The quick workflow
+  (`--top`, `--repos`) downloads whole parquet files, and a v2.x dataset
+  stores one per episode, so an uncapped run fills the disk. It audits the
+  first 25 files and says so on stderr. Lift it with `--no-file-cap`, or use
+  `--census` for a whole population survey, which streams instead of
+  downloading.
 - **The legacy `--top` and `--repos` Hub glue** predates this work and has no
   test coverage.
 - **`lerobot_ur` is a skeleton.** No real robot number has been produced by
