@@ -1,185 +1,265 @@
-# MIZAN starter kit
+<div align="center">
 
-Companion to the MIZAN research programme (the published page is the
-specification; this kit is the first commit). Three things are in here and
-all three run today.
+# MIZAN kit
 
-## 1. `cairo_protocol/` : the statistics under every experiment
+**Statistics, dataset auditing and hardware harnesses for robot learning.**
 
-`cairo_protocol/stats.py` gives you, with doctests and a test suite:
+Analyse the first trial you ever run correctly. Find out what is wrong with a
+robot dataset before you train on it. Run hardware in the loop CI with no arm
+in the room.
 
-- `anytime_cs(outcomes)` : an anytime-valid confidence sequence for a success
-  rate (Robbins' beta-binomial mixture). You may look after every trial and
-  stop whenever you like; coverage still holds. Checked by Monte Carlo in
-  `tests/test_stats.py` (3.3 percent of runs ever miss at nominal 5 percent).
-- `sequential_compare(a, b)` : declares "A>B" only when the two sequences
-  separate. With equal policies it made zero false decisions in 400 runs of
-  60 interleaved pairs; it separates a 0.9 from a 0.6 policy in a median of
-  84 trials per arm.
-- `barnard_test`, `wilson_interval`, `bootstrap_diff_ci`, `trials_needed`
-  for the fixed-n parts of a protocol.
+[![tests](https://github.com/tarekokasha22/mizan-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/tarekokasha22/mizan-kit/actions/workflows/tests.yml)
+[![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
+[![tests count](https://img.shields.io/badge/tests-148%20%2B%2017%20doctests-brightgreen)](tests/)
 
-`protocols/PROTOCOL_TEMPLATE.md` is the pre-registration file every
-programme commits before its first trial.
+</div>
 
-## 2. `ledger/` : the M-02 audit, v0, running against the Hub
+---
+
+## What this is
+
+Three components of the MIZAN research programme. All three run today, and
+the suite is green offline with no hardware and no network.
+
+| | what it does | status |
+|---|---|---|
+| **`cairo_protocol/`** | The statistics under every experiment. Anytime valid confidence sequences, so you may look after every trial and stop when you like without inflating error. | Complete, 17 doctests |
+| **`ledger/`** | Temporal integrity audit for LeRobot datasets, run as a two tier census over the Hugging Face Hub with prevalence reported as confidence intervals. | Complete, v1 |
+| **`lerobot_ur/`** | Universal Robots e-Series follower over RTDE, with force and velocity clamps and a simulator based CI gate. | Skeleton |
+
+The unifying idea is that a number without an interval is not a result, and a
+dataset nobody audited is not evidence.
+
+## Quickstart
+
+```bash
+pip install -e ".[test]"
+python -m pytest                     # 148 tests, 1 live Hub test deselected
+python -m ledger.audit --demo        # injects known defects, proves the checks catch them
+```
+
+The demo injects one defect per row. The `flags` column should name it:
 
 ```
-python -m ledger.audit --demo                       # offline, injects defects, proves the checks
-python -m ledger.audit --repos lerobot/svla_so101_pickplace,lerobot/aloha_static_cups_open
-python -m ledger.audit --top 50 --files 1 --out ledger_report.csv
+repo                 fps  frac_bad_dt  stuck_state_frac  identity_frac  lag_frames  flags
+synthetic/clean      30   0.000        0.000             0.000           2.0
+synthetic/identity   30   0.000        0.000             1.000           0.0        action_equals_state
+synthetic/drops      30   0.055        0.000             0.000           2.0        bad_dt
+synthetic/stuck      30   0.000        0.249             0.000           2.0        stuck_state
+synthetic/swapped    30   0.000        0.000             0.000          -2.0        negative_lag
+synthetic/duplicate  30   0.000        0.000             0.000           6.0        large_lag|duplicate_episodes
 ```
 
-First live run on 2 September 2026 (one parquet file per dataset):
+## 1. `cairo_protocol`, the statistics
 
+```python
+from cairo_protocol.stats import anytime_cs, sequential_compare, wilson_interval
+
+lo, hi = anytime_cs(outcomes)  # valid at EVERY stopping time
+sequential_compare(arm_a, arm_b)  # declares a winner only when the sequences separate
+wilson_interval(successes, n)  # the fixed n workhorse
 ```
-repo                               fps   eps  frac_bad_dt  stuck_state  identity  lag_frames  r_lag0  r_best  flags
-lerobot/svla_so101_pickplace       30    50   0.000        0.202        0.000     4.0         0.960   0.998   stuck_state|large_lag
-lerobot/aloha_sim_insertion_human  50    15   0.000        0.000        0.000     1.0         0.937   0.938
-lerobot/aloha_static_cups_open     50    50   0.000        0.001        0.000     2.0         0.985   0.987
-IPEC-COMMUNITY/kuka_lerobot        10    1    0.000        0.000        nan       nan         nan     nan
-```
 
-Read that first row the way the paper will have to: a 4-frame lag at 30 fps
-is 133 ms between the commanded action and the state that reaches it, and
-one frame in five repeats the previous joint reading exactly. Both may have
-innocent explanations (servo read quantisation while the arm is still, or a
-leader-follower pipeline that is simply slow) and both are exactly the kind
-of thing a policy trained on the data inherits. Nothing is a finding until
-you open the dataset and confirm it; that rule is in `CLAUDE.md`.
+`anytime_cs` is Robbins' beta binomial mixture. The interval it returns after
+any number of trials contains the true rate with probability at least
+1 - alpha, simultaneously over all times, so optional stopping is free. Checked
+by Monte Carlo in the suite: 3.3 percent of runs ever miss at a nominal 5
+percent.
 
-## 3. `lerobot_ur/` : the M-03 skeleton and its URSim CI
+`sequential_compare` is deliberately conservative, valid by a union bound. On
+equal policies it made zero false decisions in 400 runs of 60 interleaved
+pairs, and it separates a 0.9 policy from a 0.6 policy in a median of 84
+trials per arm.
 
-- `robot_ur5e.py` : a follower class over RTDE with the built-in force-torque
-  sensor in the observation, velocity and force clamps on every command,
-  and a monotonic timestamp so the audit can check sync. The LeRobot base
-  class wiring is the first overnight task (see the file header).
-- `ursim_smoke.py` : starts the stream against the official UR simulator and
-  reports rate and p50/p99/p99.9 jitter. This is the CI gate.
-- `.github/workflows/ursim-ci.yml` : runs URSim as a service container and
-  the smoke test on every push. Hardware-in-the-loop CI with no arm.
+`protocols/PROTOCOL_TEMPLATE.md` is the pre-registration a programme commits
+before its first trial.
 
+## 2. `ledger`, the dataset census
 
-## 4. `ledger/` census : the Hub wide survey (M-02, v1)
+Policies inherit whatever is wrong with the data they were trained on. This
+audits the data first.
 
-The v0 audit above samples named datasets. The census surveys the whole
-LeRobot population and reports prevalence with confidence intervals.
+### What it checks
 
-```
+Per episode, then pooled per dataset: non monotonic timestamps, frame
+intervals outside the declared fps, frame index holes, bit identical
+consecutive states (a stalled sensor), `action == observation.state` exactly
+(the "action is just the state" recording bug), the lag at which action best
+predicts state, and duplicate episodes.
+
+### Running it
+
+```bash
+huggingface-cli login                 # required, see below
 python -m ledger.audit --census metadata --out-dir census_out
-python -m ledger.audit --census deep --sample-size 800 --seed 20260905 --out-dir census_out --resume
+python -m ledger.audit --census deep --sample-size 800 --out-dir census_out --resume
 ```
 
-### Two tiers, and why it is not an exhaustive crawl
+Tier 1 records metadata for every LeRobot dataset on the Hub. Tier 2 runs the
+temporal checks over a seeded random sample and reports prevalence through
+`cairo_protocol.wilson_interval`. A sample of 800 datasets pins any prevalence
+to about plus or minus 2.8 points at 95 percent.
 
-Tier 1, metadata, visits every LeRobot dataset and records codebase version,
-fps, episode and frame counts, chunk size, layout family and the feature
-schema. Tier 2, deep, runs the temporal checks over a seeded random sample
-drawn from that frame.
+### Why it samples instead of crawling everything
 
-Tier 2's `--files` picks how many parquet files are sampled per dataset, an
-integer or `all`. For a per-episode (v2.0) layout `all` is exact, since the
-episode count is already in `info.json`. For a packed (v3.0) layout the file
-count is not in `info.json` at all (see the table below), so `all` instead
-probes file indices one at a time and stops at the first one that is not
-there; that needs the source to be able to check whether a path exists,
-which `--source stream`, `download` and `local` all can. A source that
-cannot falls back to sampling one file and marks that report's `note` column
-partial, rather than silently claiming full coverage it did not have.
+These were measured on 2026-09-05, not estimated:
 
-Prevalence is a binomial proportion, so it is reported through
-`cairo_protocol.wilson_interval` and never as a bare rate. A sample of 800
-datasets pins any prevalence to about plus or minus 2.8 points at 95 percent,
-and 1600 to about 2.0 points.
+| finding | value | consequence |
+|---|---|---|
+| LeRobot datasets on the Hub | at least 12,000 | an exhaustive crawl is not finite on one machine |
+| anonymous rate limit | HTTP 429 within tens of requests, on both the api and resolve hosts | a token is mandatory |
+| v2.0 layout | one parquet per episode; one dataset alone is 209,880 files | "every file" is tens of millions of requests |
+| audit columns | 2.7 percent of compressed parquet bytes | streaming transfers roughly 37x fewer bytes than downloading |
+| `meta/info.json` | carries a `data_path` template | paths are derived, so the census makes zero tree API calls |
 
-An exhaustive every file crawl is not attempted. These are measurements taken
-from this machine on 5 September 2026, not estimates:
-
-| finding | value |
-|---------|-------|
-| LeRobot datasets on the Hub | at least 12,000, cursor paginated at 1000 per page |
-| anonymous rate limit | HTTP 429 within tens of requests, on both the api and resolve hosts |
-| v2.0 layout | one parquet per episode; `IPEC-COMMUNITY/kuka_lerobot` alone is 209,880 files |
-| v3.0 layout | episodes packed into large files |
-| audit columns | 2.7 percent of compressed parquet bytes, so streaming transfers roughly 37x fewer bytes than downloading |
-| `meta/info.json` | carries a `data_path` template, so paths are derived and no tree API call is needed |
-
-Across at least 12,000 datasets that is tens of millions of requests against a
-free service. A partial crawl also has no sampling frame, so it supports no
-prevalence claim at all. A seeded random sample is both cheaper and more
-defensible, and the draw is recorded before the run in the same spirit as
-`protocols/PROTOCOL_TEMPLATE.md`.
+A partial crawl also has no sampling frame, so it supports no prevalence claim
+at all. A seeded random sample is cheaper and more defensible, and the draw is
+recorded before the run in the same spirit as the protocol template.
 
 ### A token is required
 
-Anonymous requests are rate limited within about a minute. Set one of:
-
-```
+```bash
 huggingface-cli login
-$env:HF_TOKEN = "hf_..."        # PowerShell, current session only
+# or, PowerShell, current session only:
+$env:HF_TOKEN = "hf_..."
 ```
 
 The token is read from `HF_TOKEN` or the CLI cache. It is never written to the
-repository and never logged.
+repository, never logged, and never appears in a repr or an error message.
+There is a test asserting both that it reaches the request and that a
+tokenless client sends no `Authorization` header at all.
 
 ### Resume
 
 Each dataset appends one JSONL record keyed by `repo@revision`, flushed per
 dataset rather than at the end. The revision is the real Hub sha, taken from
-the `X-Repo-Commit` header of a response the run already makes. Re running
-with `--resume` skips what is already recorded, so a crash at dataset 3,000
-costs one dataset and not the run, and a dataset that changed on the Hub is
-audited again rather than skipped.
+the `X-Repo-Commit` header of a response the run already makes, so it costs no
+extra requests. A crash at dataset 3,000 costs one dataset, not the run, and a
+dataset that changed on the Hub is audited again rather than skipped.
 
-### Flags are provisional
+### Flags are provisional, always
 
-Every CSV carries a header saying so. `flags` are automated measurements; the
+Every CSV carries a header saying so. `flags` are automated measurements. The
 `confirmed` column stays empty until a human opens the data. Nothing in this
-tooling calls a dataset defective, per `CLAUDE.md`.
+tooling calls a dataset defective, and CI fails the build if any code tries.
 
-### Known limitation: lag on low degree of freedom arms
+## 3. `lerobot_ur`, the hardware harness
 
-`lag_frames` is estimated by cross correlating action against state. Below 6
-action dimensions the correlation differs so little between adjacent lags that
-the argmax is not reliably the true lag: measured exact match was 96.5 to 97
-percent at 2 joints, against 0 to 2 mismatches per 6000 to 8000 trials at 6
-joints and above. Treat `large_lag` and `negative_lag` as uninformative for
-datasets with fewer than 6 action dimensions and confirm by hand. The full
-measurement is in `docs/calibration.md`.
+A LeRobot style follower for Universal Robots e-Series over RTDE, with the
+built in force torque sensor in the observation, velocity and force clamps on
+every command, and a monotonic timestamp so the audit can check sync.
+`ursim_smoke.py` measures the RTDE stream rate and jitter against the official
+simulator, which is the CI gate: hardware in the loop with no arm.
 
-## Run everything
+This is a skeleton. The LeRobot base class wiring is the next task.
 
+## Install
+
+```bash
+pip install -e .            # library
+pip install -e ".[test]"    # plus pytest and hypothesis
+pip install -e ".[dev]"     # plus ruff
+pip install -e ".[hardware]" # plus ur_rtde, for M-03
 ```
-pip install -r requirements.txt
-pytest -q
-python -m ledger.audit --demo
-make ursim && sleep 60 && python -m lerobot_ur.ursim_smoke
+
+Python 3.11 or newer.
+
+## Development
+
+```bash
+python -m pytest                            # offline suite
+python -m pytest -m network                 # live Hub tests, needs a token
+python -m doctest cairo_protocol/stats.py   # silence means all 17 pass
+ruff check . && ruff format --check .
 ```
 
 ### On Windows
 
-Windows does not ship GNU make, so the `Makefile` targets above do not run.
-The PowerShell equivalents are:
+Windows has no `make`, so the `Makefile` targets do not run. Use:
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m pytest -q                       # make test
-.\.venv\Scripts\python.exe -m ledger.audit --demo             # make demo
-.\.venv\Scripts\python.exe -m ledger.audit --top 50 --files 1 --out ledger_report.csv   # make audit
-docker run --rm -d --name ursim -p 5900:5900 -p 6080:6080 -p 29999:29999 -p 30001-30004:30001-30004 universalrobots/ursim_e-series   # make ursim
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest                            # make test
+.\.venv\Scripts\python.exe -m ledger.audit --demo               # make demo
+docker run --rm -d --name ursim -p 29999:29999 -p 30001-30004:30001-30004 universalrobots/ursim_e-series   # make ursim
 ```
-
-Live Hub tests are deselected by default. Run them with `-m network`.
 
 The M-03 URSim jitter gate is a Linux target. Docker Desktop on Windows adds a
 WSL2 network hop and Windows has a coarse default timer, so a p99.9 jitter
-figure measured there describes the host, not the robot stack. Run that gate
-on Linux.
+figure measured there describes the host, not the robot stack.
 
-## The rules
+## Repository layout
 
-`CLAUDE.md` is the operating contract for the engine: what it may edit, the
-reviewer-two pass, citation verification, the disclosure line, and the four
-things it never does (write a real-robot number, run an attack outside URSim,
-name a dataset without a human opening it, open a second front).
+```
+cairo_protocol/   statistics: confidence sequences, exact tests, power
+ledger/           the census
+  checks.py       temporal checks in an open registry
+  report.py       pooled aggregation, flagging, CSV and JSONL writers
+  census.py       two tier run loop, seeded sampling, resume
+  sources.py      SampleSource: streaming, download, local, synthetic
+  hubclient.py    token aware HTTP with backoff and pagination
+  paths.py        parquet paths derived from info.json
+  synth.py        seeded generator, one injector per defect
+  audit.py        the CLI
+lerobot_ur/       UR5e follower and its URSim smoke test
+protocols/        the pre-registration template
+docs/             calibration measurements, design spec, decision record
+tests/            148 tests, plus a frozen v0 reference
+```
+
+## Design decisions worth knowing
+
+**The refactor provably changed nothing.** `tests/v0_reference.py` is a frozen
+snapshot of the audit as v0 shipped it, and equivalence tests assert the
+current pipeline reproduces it exactly, for single and multi part inputs. The
+guarantee was verified as non tautological: a deliberate change to the pooled
+denominator makes both equivalence tests fail.
+
+**Aggregation is pooled, not averaged.** Rates are
+`sum(numerator) / sum(denominator)` across parts, never a mean of per episode
+fractions. Those two differ whenever episodes have unequal length, which is
+exactly what dropped frames and real Hub data produce.
+
+**Thresholds are calibrated, not guessed.** `docs/calibration.md` records the
+measured false positive sweep behind every value in `ledger/thresholds.toml`.
+
+**Adding a check is adding a function.** Checks live in a registry, so the
+flag list, the CSV columns and the report schema cannot drift apart.
+
+## Limitations
+
+Stated plainly, because a kit that hides these is worse than no kit.
+
+- **Lag on low degree of freedom arms.** `lag_frames` cross correlates action
+  against state. Below 6 action dimensions the correlation differs so little
+  between adjacent lags that the argmax is not reliably the true lag: measured
+  exact match was 96.5 to 97 percent at 2 joints, against 0 to 2 mismatches
+  per 6000 to 8000 trials at 6 joints and above. Treat `large_lag` and
+  `negative_lag` as uninformative below 6 action dimensions and confirm by
+  hand. Full measurement in `docs/calibration.md`.
+- **The census has not been run at full scale yet.** Everything is verified
+  offline against fixtures and a small number of live probes.
+- **`--files all` on packed v3.0 layouts** discovers files by probing
+  sequential indices. A source that cannot answer an existence check falls
+  back to sampling one file, and the report records that the audit was
+  partial.
+- **The legacy `--top` and `--repos` Hub glue** predates this work and has no
+  test coverage.
+- **`lerobot_ur` is a skeleton.** No real robot number has been produced by
+  this repository, and none should be until the LeRobot wiring lands.
+
+## Citing
+
+See `CITATION.cff`, or use the GitHub "Cite this repository" button.
+
+## Disclosure
+
+Experiment code, simulation harnesses, data audit tooling and first drafts
+were produced with Claude and verified by the authors; all hardware
+experiments, statistics and claims are the authors' own.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
