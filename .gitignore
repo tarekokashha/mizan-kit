@@ -17,6 +17,8 @@ census_out/
 # results/ is the programme's append only log, per CLAUDE.md. Census
 # output committed there is evidence, not a regenerable build artifact.
 !results/*.jsonl
+!results/*.csv
+!results/*.json
 
 # HF cache if ever pointed here
 .hf_cache/
