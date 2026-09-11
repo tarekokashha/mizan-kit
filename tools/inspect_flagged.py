@@ -50,9 +50,18 @@ def inspect(repo: str, source: StreamingSource) -> int:
 
     a = np.stack([np.asarray(v, dtype=np.float64) for v in df["action"]])
     s = np.stack([np.asarray(v, dtype=np.float64) for v in df["observation.state"]])
-    identical = np.all(np.isclose(a, s, atol=0.0), axis=1)
 
     print(f"\n  action dims {a.shape[1]}, state dims {s.shape[1]}")
+    if a.shape != s.shape:
+        # ledger.checks guards this too and returns nan rather than comparing.
+        # A dataset whose action and state have different widths cannot be
+        # compared elementwise, and the mismatch is itself worth a look.
+        print("  action and observation.state have DIFFERENT widths, so they")
+        print("  cannot be compared frame by frame. The audit reports nan for")
+        print("  identity on this dataset rather than a number. The mismatch")
+        print("  is itself the thing to investigate.")
+        return 0
+    identical = np.all(np.isclose(a, s, atol=0.0), axis=1)
     print(
         f"  frames where action == observation.state EXACTLY: "
         f"{identical.sum()} of {len(identical)} ({identical.mean():.3f})"

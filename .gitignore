@@ -18,6 +18,7 @@ census_out/
 # output committed there is evidence, not a regenerable build artifact.
 !results/*.jsonl
 !results/*.csv
+!results/*.txt
 !results/*.json
 
 # HF cache if ever pointed here

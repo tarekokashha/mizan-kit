@@ -1,0 +1,374 @@
+16 dataset(s) carrying a confirmable flag
+
+========================================================================
+omnaathg/trial_so101_4
+https://huggingface.co/datasets/omnaathg/trial_so101_4
+========================================================================
+  codebase v3.0  fps 30  episodes 1
+  read data/chunk-000/file-000.parquet: 1200 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 1200 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [17.7986, 30.98529, 57.01703, 89.81723, 1.79361, 59.64912]
+        state  [20.053, 22.39965, 57.54875, 91.37187, 1.61212, 59.28667]
+        equal: False
+    [1] action [17.7986, 30.98529, 57.01703, 89.81723, 1.79361, 59.64912]
+        state  [20.053, 22.39965, 57.54875, 91.37187, 1.61212, 59.28667]
+        equal: False
+    [2] action [17.7986, 30.98529, 57.01703, 89.81723, 1.79361, 59.64912]
+        state  [20.053, 22.39965, 57.54875, 91.37187, 1.61212, 59.28667]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+yianW/cloth_hanger_data_v0
+https://huggingface.co/datasets/yianW/cloth_hanger_data_v0
+========================================================================
+  codebase v3.0  fps 15  episodes 480
+  read data/chunk-000/file-000.parquet: 8110 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 7, state dims 7
+  frames where action == observation.state EXACTLY: 480 of 8110 (0.059)
+
+  first 3 frames, action vs state:
+    [0] action [0.2909, -0.22109, 0.17236, 0.43125, 0.55552, -0.51647]
+        state  [0.29448, -0.21092, 0.17223, 0.42993, 0.558, -0.51369]
+        equal: False
+    [1] action [0.29085, -0.22868, 0.17486, 0.43267, 0.55465, -0.5176]
+        state  [0.2909, -0.22109, 0.17236, 0.43125, 0.55552, -0.51647]
+        equal: False
+    [2] action [0.28743, -0.23934, 0.17414, 0.43059, 0.55582, -0.5183]
+        state  [0.29085, -0.22868, 0.17486, 0.43267, 0.55465, -0.5176]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+qingshu123/Airbot_MMK2_storage_egg_white_box
+https://huggingface.co/datasets/qingshu123/Airbot_MMK2_storage_egg_white_box
+========================================================================
+  codebase v2.1  fps 30  episodes 43
+  read data/chunk-000/episode_000000.parquet: 126 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 36, state dims 36
+  frames where action == observation.state EXACTLY: 126 of 126 (1.000)
+
+  first 3 frames, action vs state:
+    [0] action [0.97982, -0.8803, 0.99184, 0.0268, -1.09951, 0.83429]
+        state  [0.97982, -0.8803, 0.99184, 0.0268, -1.09951, 0.83429]
+        equal: True
+    [1] action [0.97982, -0.88149, 0.99295, 0.02829, -1.09602, 0.83252]
+        state  [0.97982, -0.88149, 0.99295, 0.02829, -1.09602, 0.83252]
+        equal: True
+    [2] action [0.9798, -0.88385, 0.99501, 0.03106, -1.08847, 0.82927]
+        state  [0.9798, -0.88385, 0.99501, 0.03106, -1.08847, 0.82927]
+        equal: True
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+Mimic-Robotics/full_ttt_redx_NEWTASKNAME
+https://huggingface.co/datasets/Mimic-Robotics/full_ttt_redx_NEWTASKNAME
+========================================================================
+  codebase v3.0  fps 15  episodes 678
+  read data/chunk-000/file-000.parquet: 326999 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 15, state dims 15
+  frames where action == observation.state EXACTLY: 0 of 326999 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-10.66368, -98.91077, 99.81834, 77.54105, -28.98657, 98.36207]
+        state  [-36.43472, -98.32201, 99.36044, 72.59228, -30.89133, 99.14833]
+        equal: False
+    [1] action [-10.66368, -98.91077, 99.81834, 77.54105, -28.98657, 98.36207]
+        state  [-36.43472, -98.32201, 99.36044, 72.59228, -30.89133, 99.14833]
+        equal: False
+    [2] action [-10.66368, -98.91077, 99.81834, 77.54105, -28.98657, 98.36207]
+        state  [-34.71462, -98.40192, 99.36044, 73.52567, -29.76801, 98.7225]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+Hailey-5-2026/grab_block_20ep_20260908_180440
+https://huggingface.co/datasets/Hailey-5-2026/grab_block_20ep_20260908_180440
+========================================================================
+  codebase v3.0  fps 30  episodes 20
+  read data/chunk-000/file-000.parquet: 8894 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 8894 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [1.58242, -104.74725, 90.85714, 67.91209, 4.0, 18.05907]
+        state  [2.37363, -102.94505, 96.0, 45.84615, 3.56044, 0.64875]
+        equal: False
+    [1] action [1.58242, -104.74725, 90.85714, 67.91209, 4.0, 18.05907]
+        state  [2.28571, -102.94505, 94.50549, 53.05495, 3.56044, 6.95088]
+        equal: False
+    [2] action [1.58242, -104.74725, 90.85714, 67.91209, 4.0, 18.05907]
+        state  [2.28571, -102.94505, 94.41758, 57.18681, 3.56044, 10.2873]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+Chibaa/rollout_0718_20260724_195935
+https://huggingface.co/datasets/Chibaa/rollout_0718_20260724_195935
+========================================================================
+  codebase v3.0  fps 30  episodes 1
+  read data/chunk-000/file-000.parquet: 150 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 150 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-1.22173, -106.80856, 99.88844, -109.62852, 2.0603, 1.58902]
+        state  [1.18681, -105.67033, 94.72527, -102.85714, -4.7033, 12.44116]
+        equal: False
+    [1] action [-1.17885, -106.74063, 99.92934, -109.66392, 1.88757, 1.6419]
+        state  [1.18681, -105.67033, 94.72527, -102.85714, -4.7033, 12.44116]
+        equal: False
+    [2] action [-1.19401, -106.57426, 99.90922, -109.90811, 2.15831, 1.66356]
+        state  [1.18681, -105.67033, 94.72527, -102.85714, -4.7033, 12.44116]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+rslxcvg/task2_v2
+https://huggingface.co/datasets/rslxcvg/task2_v2
+========================================================================
+  codebase v3.0  fps 30  episodes 180
+  read data/chunk-000/file-000.parquet: 74430 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 74430 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-4.13187, -41.58242, -7.12088, 84.17583, -4.35165, 2.54307]
+        state  [-0.74725, -102.32967, 93.62637, 61.31868, -4.17582, 2.75103]
+        equal: False
+    [1] action [-4.13187, -41.58242, -7.12088, 84.17583, -4.35165, 2.54307]
+        state  [-1.45055, -101.71429, 93.36264, 62.1978, -4.26374, 2.75103]
+        equal: False
+    [2] action [-4.13187, -41.58242, -7.12088, 84.17583, -4.35165, 2.54307]
+        state  [-2.85714, -99.16483, 91.42857, 64.92308, -4.17582, 2.75103]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+zouhan/record-test
+https://huggingface.co/datasets/zouhan/record-test
+========================================================================
+  codebase v2.1  fps 30  episodes 2
+  read data/chunk-000/episode_000000.parquet: 299 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 299 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-9.75881, -99.49749, 100.0, -99.39603, -0.25893, 0.91673]
+        state  [-9.80684, -99.40829, 99.63785, -99.13941, -0.10471, 1.15725]
+        equal: False
+    [1] action [-9.75881, -99.49749, 100.0, -99.39603, -0.25893, 0.91673]
+        state  [-9.80684, -99.40829, 99.63785, -99.13941, -0.10471, 1.15725]
+        equal: False
+    [2] action [-9.75881, -99.49749, 100.0, -99.39603, -0.25893, 0.91673]
+        state  [-9.80684, -99.40829, 99.63785, -99.13941, -0.10471, 1.15725]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+schronn/record-test_20260701_162939
+https://huggingface.co/datasets/schronn/record-test_20260701_162939
+========================================================================
+  codebase v3.0  fps 30  episodes 2
+  read data/chunk-000/file-000.parquet: 972 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 972 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-13.27472, -103.25275, 96.52747, -91.64835, -93.84615, 1.41287]
+        state  [-13.67033, -102.37363, 96.21978, -91.64835, -93.75824, 1.54341]
+        equal: False
+    [1] action [-13.27472, -103.25275, 96.52747, -91.64835, -93.84615, 1.41287]
+        state  [-13.67033, -102.63736, 96.21978, -91.64835, -93.75824, 1.54341]
+        equal: False
+    [2] action [-13.27472, -103.25275, 96.52747, -91.64835, -93.84615, 1.41287]
+        state  [-13.67033, -102.63736, 96.21978, -91.64835, -93.75824, 1.54341]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+Kovavavvavava/pick_toys_human_1_ss_filter
+https://huggingface.co/datasets/Kovavavvavava/pick_toys_human_1_ss_filter
+========================================================================
+  codebase v2.1  fps 15  episodes 91
+  read data/chunk-000/episode_000000.parquet: 271 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 8, state dims 8
+  frames where action == observation.state EXACTLY: 271 of 271 (1.000)
+
+  first 3 frames, action vs state:
+    [0] action [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        state  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        equal: True
+    [1] action [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        state  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        equal: True
+    [2] action [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        state  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        equal: True
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+vis22/act_rightbiscuit_20260728_175044
+https://huggingface.co/datasets/vis22/act_rightbiscuit_20260728_175044
+========================================================================
+  codebase v3.0  fps 30  episodes 50
+  read data/chunk-000/file-000.parquet: 29870 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 7, state dims 7
+  frames where action == observation.state EXACTLY: 29870 of 29870 (1.000)
+
+  first 3 frames, action vs state:
+    [0] action [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        state  [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        equal: True
+    [1] action [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        state  [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        equal: True
+    [2] action [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        state  [0.14891, 0.00803, -0.00126, -0.11306, 0.32723, 0.14289]
+        equal: True
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+RoboCOIN/Airbot_MMK2_storage_onion_sweet_potato
+https://huggingface.co/datasets/RoboCOIN/Airbot_MMK2_storage_onion_sweet_potato
+========================================================================
+  codebase v2.1  fps 30  episodes 50
+  read data/chunk-000/episode_000000.parquet: 152 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 36, state dims 36
+  frames where action == observation.state EXACTLY: 152 of 152 (1.000)
+
+  first 3 frames, action vs state:
+    [0] action [1.11076, -0.76343, 0.91111, -0.14367, -1.13112, 0.8176]
+        state  [1.11076, -0.76343, 0.91111, -0.14367, -1.13112, 0.8176]
+        equal: True
+    [1] action [1.10862, -0.76322, 0.90965, -0.14363, -1.12649, 0.82722]
+        state  [1.10862, -0.76322, 0.90965, -0.14363, -1.12649, 0.82722]
+        equal: True
+    [2] action [1.10424, -0.76287, 0.90689, -0.14345, -1.11741, 0.84616]
+        state  [1.10424, -0.76287, 0.90689, -0.14345, -1.11741, 0.84616]
+        equal: True
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+FedorX8/dobbe_lerobot
+https://huggingface.co/datasets/FedorX8/dobbe_lerobot
+========================================================================
+  codebase v3.0  fps 3  episodes 5208
+  read data/chunk-000/file-000.parquet: 1002592 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 7, state dims 8
+  action and observation.state have DIFFERENT widths, so they
+  cannot be compared frame by frame. The audit reports nan for
+  identity on this dataset rather than a number. The mismatch
+  is itself the thing to investigate.
+
+========================================================================
+ConnorJiang/qg_act_double_rm75_cup_scan_2
+https://huggingface.co/datasets/ConnorJiang/qg_act_double_rm75_cup_scan_2
+========================================================================
+  codebase v2.0  fps 30  episodes 80
+  read data/chunk-000/episode_000000.parquet: 597 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 16, state dims 16
+  frames where action == observation.state EXACTLY: 597 of 597 (1.000)
+
+  first 3 frames, action vs state:
+    [0] action [0.31897, -1.51065, 1.65487, 0.28218, 0.02764, -0.18556]
+        state  [0.31897, -1.51065, 1.65487, 0.28218, 0.02764, -0.18556]
+        equal: True
+    [1] action [0.31897, -1.51063, 1.65487, 0.28222, 0.02759, -0.1856]
+        state  [0.31897, -1.51063, 1.65487, 0.28222, 0.02759, -0.1856]
+        equal: True
+    [2] action [0.31895, -1.51063, 1.65484, 0.28218, 0.02762, -0.18556]
+        state  [0.31895, -1.51063, 1.65484, 0.28218, 0.02762, -0.18556]
+        equal: True
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+geonmin-kim/SO101-large-blue-fpv-D6251-0810
+https://huggingface.co/datasets/geonmin-kim/SO101-large-blue-fpv-D6251-0810
+========================================================================
+  codebase v3.0  fps 30  episodes 82
+  read data/chunk-000/file-000.parquet: 23154 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 23154 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [-20.0, -98.63736, 101.58242, 72.79121, -97.49451, 11.62207]
+        state  [-20.74725, -98.37363, 96.61539, 72.26373, -97.97802, 11.05898]
+        equal: False
+    [1] action [-20.0, -98.63736, 101.58242, 72.79121, -97.49451, 11.53846]
+        state  [-20.74725, -98.37363, 96.61539, 72.26373, -97.97802, 11.05898]
+        equal: False
+    [2] action [-20.0, -98.63736, 101.58242, 72.79121, -97.49451, 11.53846]
+        state  [-20.57143, -98.54945, 96.61539, 72.35165, -97.97802, 11.26005]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
+
+========================================================================
+radioKale/so100_test_02_20260615_104905
+https://huggingface.co/datasets/radioKale/so100_test_02_20260615_104905
+========================================================================
+  codebase v3.0  fps 30  episodes 50
+  read data/chunk-000/file-000.parquet: 28832 frames, columns ['timestamp', 'frame_index', 'episode_index', 'action', 'observation.state']
+
+  action dims 6, state dims 6
+  frames where action == observation.state EXACTLY: 0 of 28832 (0.000)
+
+  first 3 frames, action vs state:
+    [0] action [0.17582, -101.27473, 96.79121, 81.67033, -4.83517, 31.66058]
+        state  [0.13187, -99.47253, 94.54945, 80.92308, -4.57143, 31.25428]
+        equal: False
+    [1] action [0.17582, -101.27473, 96.79121, 81.67033, -4.83517, 31.66058]
+        state  [0.13187, -99.47253, 94.54945, 80.92308, -4.57143, 31.25428]
+        equal: False
+    [2] action [0.17582, -101.27473, 96.79121, 81.67033, -4.83517, 31.66058]
+        state  [0.13187, -99.56044, 94.54945, 80.92308, -4.57143, 31.32282]
+        equal: False
+
+  This tool asserts nothing about whether this dataset is defective.
+  Record your judgement in the confirmed column.
