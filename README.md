@@ -107,7 +107,7 @@ These were measured on 2026-09-05, not estimated:
 
 | finding | value | consequence |
 |---|---|---|
-| LeRobot datasets on the Hub | at least 12,000 | an exhaustive crawl is not finite on one machine |
+| LeRobot datasets on the Hub | at least 75,750 | an exhaustive crawl is not finite on one machine |
 | anonymous rate limit | HTTP 429 within tens of requests, on both the api and resolve hosts | a token is mandatory |
 | v2.0 layout | one parquet per episode; one dataset alone is 209,880 files | "every file" is tens of millions of requests |
 | audit columns | 2.7 percent of compressed parquet bytes | streaming transfers roughly 37x fewer bytes than downloading |

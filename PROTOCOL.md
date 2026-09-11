@@ -337,7 +337,7 @@ trial," and it is recorded here plainly rather than hidden.
   within tens of requests; the client's backoff and minimum request
   interval carried the run, at the cost of pace, not of the sample
   itself, since the draw was fixed before the run began.
-- Population size. 400 is a sample of at least 12,000 LeRobot datasets
+- Population size. 400 is a sample of at least 75,750 LeRobot datasets
   on the Hub, per the design doc's own measurement. The intervals in
   this protocol and in the results describe that sample; they are not
   a claim about having audited the population.

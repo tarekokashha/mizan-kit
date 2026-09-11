@@ -18,6 +18,14 @@ daily. The seed and size therefore do not identify this sample: re running
 different datasets. Measured overlap between this sample and a draw two
 days later was 3 of 400.
 
+A second correction: this document and its sources described the population
+as "at least 12,000". That was a floor from a probe that stopped after 12
+pages, not a measurement. Exhausting the listing on 2026-09-11 gave 75,750
+unique dataset ids, so this sample is about 0.53 percent of the population
+rather than the 3.3 percent the old figure implied. The Wilson intervals
+below are unaffected, because they do not depend on population size at this
+scale, but the framing was too generous.
+
 The sampler has been fixed to rank each repo by a hash of its own id and
 the seed, which is stable under population growth. But the frame that
 produced the sample below was never recorded, so this particular sample
@@ -115,7 +123,7 @@ tool that branches on `codebase_version` alone, rather than reading
 - No dataset here is defective. These are declarations the publishers made,
   recorded as measurements. Per `CLAUDE.md`, a finding requires a human to
   open the data and confirm it.
-- 400 of at least 12,000 datasets. The intervals above describe that sample.
+- 400 of at least 75,750 datasets, about 0.53 percent. The intervals above describe that sample.
 - Run anonymously, so throttling shaped the pace but not the sample: the
   draw was fixed before the run began.
 

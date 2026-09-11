@@ -161,16 +161,16 @@ opened either of these.
 measurement that forced this programme's design: an anonymous client hits
 HTTP 429 within tens of requests against both the Hub's `api/` and
 `resolve/` endpoints, and the LeRobot population on the Hub is at least
-12,000 datasets, large enough that an exhaustive crawl is not finite on one
+75,750 datasets, large enough that an exhaustive crawl is not finite on one
 machine. The completed tier 1 census
 (`results/2026-09-09-metadata-census-400.md`) confirms it ran anonymously,
 with no token, relying on `hubclient.py`'s backoff and minimum request
 interval to carry the run.
 
-400 of at least 12,000 datasets is a sample fraction of at most about 3.3
-percent, and could be smaller if the true population is larger than 12,000;
+400 of at least 75,750 datasets, about 0.53 percent is a sample fraction of at most about 3.3
+percent of the 75,750 datasets measured on 2026-09-11;
 this programme has not measured the exact current population size, only
-that it is at least 12,000. The Wilson intervals reported against this
+that it is at least 75,750. The Wilson intervals reported against this
 sample in `DRAFT.md` describe that sample. They are not a claim about every
 LeRobot dataset on the Hub, and they do not become one by being the only
 number available. Throttling shaped how long the run took, not which

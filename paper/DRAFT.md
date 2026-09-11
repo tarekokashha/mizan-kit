@@ -11,7 +11,7 @@ programme does not yet support.
 
 This is a draft abstract. What is established: a metadata-only census
 (tier 1) over a seeded, reproducible sample of 400 LeRobot Hub datasets,
-drawn from a population of at least 12,000, describing what each dataset's
+drawn from a population of at least 75,750, describing what each dataset's
 `meta/info.json` declares about its codebase version, storage layout, frame
 rate, and size. Every proportion below carries a Wilson 95 percent
 confidence interval. What is not established: any finding about temporal
@@ -51,7 +51,7 @@ records that the tool this programme extends, `ledger/audit.py` v0,
 files," and that a Hub-wide prevalence table "neither exists," despite
 being the README's own stated next step. The same design document measures
 why: an anonymous client is rate-limited within tens of requests against
-the Hub API, the population is at least 12,000 datasets, and some
+the Hub API, the population is at least 75,750 datasets, and some
 individual datasets alone (`kuka_lerobot`, under the older per-episode
 layout) span over 200,000 files, so an exhaustive crawl "is not finite on
 one machine." A crawl that stops partway has no defined sampling frame and
@@ -264,7 +264,7 @@ deep tier ledger does not currently record enough per-dataset information
 to apply that limitation record by record; the roughly one percent of
 datasets excluded from any parquet-level claim and why; the anonymous,
 rate-limited, small-sample nature of this census against a population of
-at least 12,000; the absence of a committed `PROTOCOL.md` for this
+at least 75,750; the absence of a committed `PROTOCOL.md` for this
 programme; and the fact that tier 1 measures what publishers declared, not
 what their data contains.
 

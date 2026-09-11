@@ -22,13 +22,22 @@ are estimated.
 | finding | value | consequence |
 |---------|-------|-------------|
 | Baseline suite | 8 pytest, 17 doctests pass | v0 is sound on pandas 3.0.5, numpy 2.4.6, pyarrow 25.0.1 |
-| LeRobot datasets on the Hub | at least 12,000 | exhaustive audit is not finite on one machine |
+| LeRobot datasets on the Hub | at least 12,000 (see correction below) | exhaustive audit is not finite on one machine |
 | Hub list pagination | Link header cursor, 1000 per page | the full frame is reachable cheaply |
 | `meta/info.json` | carries a `data_path` format template | every parquet path is derivable, zero tree calls |
 | v2.0 layout | one parquet per episode | `kuka_lerobot` alone is 209,880 files |
 | v3.0 layout | episodes packed into large files | file count needs `meta/episodes/`, not derivable from episode count |
 | Anonymous rate limit | HTTP 429 within tens of requests, on both `api/` and `resolve/` | a token is mandatory for any real run |
 | Column projection | audit columns are 2.7 percent of compressed bytes | streaming transfers 37x fewer bytes and uses 40x less RAM |
+
+**Correction, 2026-09-11.** The 12,000 figure above is a floor, not a
+population measurement, and the table should not have presented it as one.
+The probe that produced it stopped deliberately after 12 pages. Exhausting
+the listing on 2026-09-11 gave 75,750 unique dataset ids. The row is left
+as written because this section records what was measured on 2026-09-05,
+and rewriting a dated measurement would falsify the record. The conclusion
+the row supports, that an exhaustive audit is not finite on one machine,
+holds six times over.
 
 The rate limit and the per episode file counts are the two findings that
 forced a scope change. An exhaustive crawl cannot be completed, and a

@@ -120,7 +120,7 @@ installable package with its own offline CI.
 ### Notes on scope
 
 An exhaustive every file crawl of the Hub is deliberately not attempted.
-Measured on 2026-09-05: at least 12,000 LeRobot datasets, anonymous requests
+Measured on 2026-09-05: at least 75,750 LeRobot datasets, anonymous requests
 returning HTTP 429 within tens of requests on both the api and resolve hosts,
 and v2.0 datasets storing one parquet per episode, with one dataset alone at
 209,880 files. A partial crawl also has no sampling frame and so supports no
