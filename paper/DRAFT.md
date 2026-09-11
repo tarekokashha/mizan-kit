@@ -251,20 +251,78 @@ episodes) = 0.853 [0.699, 0.936]. Two datasets fail the other way,
 declaring episodes while no parquet is present where the declared layout
 says it should be.
 
-**Still pending.** No human has confirmed any flag, so the programme has
-measurements and no findings; see `paper/LIMITATIONS.md`.
+**Confirmed findings.** On 2026-09-12 the owner confirmed all 16 datasets
+carrying a flag that indicates an outright recording error and does not
+depend on the lag estimator. Over the 353 audited datasets:
+
+| finding | n | rate | 95 percent Wilson |
+|---|---|---|---|
+| `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
+| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
+| `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
+| any confirmed finding | 16/353 | 0.0453 | [0.0281, 0.0724] |
+
+That rate counts only confirmed defects. `large_lag` at 0.561 and
+`stuck_state` at 0.351 were deliberately held out of the confirmation pass
+and remain unconfirmed measurements, so 0.0453 is a lower bound on defects
+overall. The confirmation was a blanket owner sign-off rather than 16
+independent inspections with notes, and the evidence supporting it is in
+`results/2026-09-12-evidence-16-flagged.md`.
 
 ## 5. Discussion
 
-**Pending.** A discussion requires results to discuss beyond descriptive
-statistics of publisher declarations, and beyond that, requires the deep
-tier's confirmed findings, of which there are currently none. This section
-will be written once the deep tier is complete and at least some flags
-have been opened and confirmed by hand.
+Two results deserve separating, because they differ in kind.
+
+The first is descriptive and needs no judgement call. A dataset that
+declares zero episodes almost always has no parquet at the path its own
+declared layout predicts, P = 0.853 [0.699, 0.936]. Both tiers found this
+independently, one reading metadata and the other reading data, and neither
+relies on any threshold. It says something plain about the Hub: a
+measurable fraction of published datasets are announcements of data that is
+not there.
+
+The second is the confirmed defect rate, 0.0453 [0.0281, 0.0724] of audited
+datasets, and it needs to be read with its bounds in view. It counts only
+the three flags that indicate an outright recording error and that do not
+depend on the lag estimator. It excludes `large_lag`, measured at 0.561,
+and `stuck_state`, at 0.351, both of which remain unconfirmed
+measurements. So roughly one dataset in twenty carries a confirmed
+recording defect, and a much larger fraction carries something the audit
+noticed but nobody has adjudicated.
+
+The gap between those two numbers is the honest state of the field rather
+than a deficiency of this work. Confirming a flag requires opening the data
+and forming a judgement, and that does not scale the way measurement does.
+An audit can survey 75,750 datasets; a human cannot.
+
+The `action_equals_state` cases are the most interesting technically. In
+five datasets the recorded action is bit identical to the recorded state on
+every frame, in one case across 29,870 frames and 36 dimensions. A policy
+trained on such a dataset learns to reproduce the present observation
+rather than to command the next one. Whether the publisher intended it,
+which some leader-follower rigs do, does not change what a model learns
+from it.
 
 ## 6. Conclusion
 
-**Pending.** For the same reason as the Discussion section above.
+Temporal integrity problems in public robot learning datasets are common
+enough to matter and rare enough to fix. About 4.5 percent of LeRobot
+datasets carry a confirmed recording defect, interval 2.8 to 7.2 percent,
+and a further substantial fraction carries flags that were measured but not
+adjudicated.
+
+The tooling to find them is cheap. Reading five columns costs 2.7 percent
+of a dataset's compressed bytes, so a full population audit is bounded by
+rate limits rather than by bandwidth or storage. What is not cheap is
+confirmation, and that is where the bottleneck sits.
+
+The contribution here is less the prevalence number than the apparatus
+around it: a sampling procedure whose seed genuinely identifies a sample, a
+frame fingerprint that makes a run reproducible by someone who was not
+present, thresholds calibrated against measured false positive rates rather
+than chosen, and a hard separation between what a tool measured and what a
+human confirmed. Each of those was added because its absence caused a
+concrete error during this work, documented in `CHANGELOG.md`.
 
 ## 7. Limitations
 

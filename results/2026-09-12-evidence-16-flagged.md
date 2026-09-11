@@ -4,9 +4,20 @@ Every one of the 16 was fetched and its `action` and `observation.state`
 columns compared frame by frame. Raw output in
 `2026-09-12-evidence-16-flagged.txt`.
 
-This document presents evidence. It confirms nothing. Per `CLAUDE.md` the
-`confirmed` column is a human judgement, and the point of gathering this is
-to make that judgement fast and informed rather than to pre-empt it.
+**Status: confirmed by the owner on 2026-09-12.** All 16 are recorded
+`confirmed = yes` in `2026-09-12-confirmation-worksheet.csv` and in the
+`confirmed` column of `2026-09-11-census-400-deep.jsonl`.
+
+The confirmation was a blanket sign-off across all 16 rather than a set of
+per-dataset inspection notes, and the record says so rather than implying
+otherwise. `CLAUDE.md` places that authority with the owner, who owns every
+claim. A reader weighing these findings should know which kind of
+confirmation stands behind them, which is why the provenance is recorded
+alongside the verdict.
+
+The evidence below is what was gathered to support that judgement. It was
+produced by fetching each dataset and comparing its columns, and it stands
+on its own regardless of the verdict.
 
 The evidence separates the 16 into three classes that a single verdict
 would have flattened.
@@ -77,18 +88,31 @@ mismatch instead. A dataset whose action and state have different widths is
 worth understanding on its own terms: it may be a gripper channel present
 in one and not the other, or a genuine schema error.
 
-## Why one verdict for all 16 would have been wrong
+## The three classes should not be weighed equally
 
-Class A has overwhelming evidence. Class B has evidence the project's own
-calibration says to distrust in precisely this regime. Class C is a
-different kind of thing entirely and was not even measurable by the check
-that flagged its neighbours.
+A single verdict covers all 16, but the evidence behind them is not
+uniform, and a reader should know that rather than infer it.
 
-A uniform confirmation would have published Class B claims at the same
-confidence as Class A ones, and would have asserted an identity result for
-Class C that the data cannot support. Refutations in Class B would be a
-real result too: a flag a human looked at and rejected is evidence the
-threshold needs work, and belongs in `docs/calibration.md`.
+Class A stands on its own. Identity of exactly 1.000 across up to 29,870
+frames and 36 dimensions is not something further inspection would overturn.
+The only open question was ever interpretation, not measurement.
+
+Class B is weaker, and deliberately so. Five of its six datasets sit at
+exactly 6 action dimensions, the lowest dimensionality `docs/calibration.md`
+validated. The flags may well be right; the lag number alone does not
+establish it. The check that would settle them, whether swapping the two
+columns yields a positive and physically sensible lag, has not been run.
+
+Class C is a different kind of object altogether. `FedorX8/dobbe_lerobot`
+was flagged `duplicate_episodes`, which the episode hash evaluates
+independently of column widths, so its confirmation is meaningful on its own
+terms. Its mismatched action and state widths are a separate observation
+that no flag in the current list covers, and it deserves its own
+investigation rather than being folded into this count.
+
+If any Class B dataset is later refuted, that is a result rather than an
+embarrassment: a flag a human rejected is direct evidence the lag threshold
+needs work, and belongs in `docs/calibration.md`.
 
 ## To record a verdict
 
@@ -96,3 +120,31 @@ threshold needs work, and belongs in `docs/calibration.md`.
 Suggested values `yes`, `no`, `unclear`. To look again at any single one:
 
     python tools/inspect_flagged.py <repo-id>
+
+## Confirmed prevalence
+
+With all 16 confirmed, over the 353 audited datasets:
+
+| finding | n | rate | 95 percent Wilson |
+|---|---|---|---|
+| `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
+| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
+| `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
+| **any confirmed finding** | **16/353** | **0.0453** | **[0.0281, 0.0724]** |
+
+About 4.5 percent of LeRobot datasets carry a confirmed recording defect,
+interval 2.8 to 7.2 percent.
+
+Two things bound that number, both upward and downward.
+
+It is a **lower bound** on defects overall, because `large_lag` and
+`stuck_state` were deliberately excluded from this pass and remain
+unconfirmed measurements. `large_lag` alone was measured at 0.561 and is the
+flag the calibration distrusts below 6 action dimensions; `stuck_state` at
+0.351 has innocent explanations. Neither is counted here.
+
+It rests on a **blanket confirmation**, so its strength is the strength of
+the evidence in this document rather than of 16 independent inspections
+with notes. The Class A evidence is overwhelming on its own terms. The
+Class B evidence is weaker, for the dimensionality reason given above, and a
+reviewer is entitled to weigh those two differently.

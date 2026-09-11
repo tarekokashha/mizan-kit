@@ -6,6 +6,33 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Findings
+
+- The programme has findings rather than measurements alone. On 2026-09-12
+  the owner confirmed all 16 datasets carrying `action_equals_state`,
+  `negative_lag` or `duplicate_episodes`, the three flags that indicate an
+  outright recording error and do not depend on the lag estimator.
+  Confirmed prevalence over the 353 audited datasets is 0.0453
+  [0.0281, 0.0724], about one dataset in twenty.
+- That rate is a lower bound. `large_lag` at 0.561 and `stuck_state` at
+  0.351 were deliberately held out of the confirmation pass and remain
+  unconfirmed measurements.
+- The confirmation was a blanket owner sign-off rather than 16 independent
+  inspections with per-dataset notes, and every document that carries the
+  rate says so. The evidence gathered to support it, which separates the 16
+  into three classes of very different strength, is in
+  `results/2026-09-12-evidence-16-flagged.md`.
+- `paper/DRAFT.md` gains a Discussion and a Conclusion. Related Work stays
+  Pending, because `CLAUDE.md` forbids citing from memory and no citation
+  has been fetched and verified.
+
+### Fixed
+
+- `tools/inspect_flagged.py` crashed on a dataset whose `action` and
+  `observation.state` have different widths, `FedorX8/dobbe_lerobot` at 7
+  and 8 over a million frames. `ledger/checks.py` already guarded that case
+  and returns nan; the tool now reports the mismatch instead of raising.
+
 ### Results
 
 - First fully auditable census: 400 datasets, both tiers, one recorded

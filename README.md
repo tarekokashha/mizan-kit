@@ -48,10 +48,29 @@ independently:
 > A dataset that declares zero episodes usually has no parquet at all.
 > **P = 0.853, interval [0.699, 0.936]**, 29 of 34.
 
-And none of it is a finding yet. Every number above is a measurement. Per
-[`CLAUDE.md`](CLAUDE.md), no dataset is called defective until a human opens
-it and confirms, and the `confirmed` column is empty for all 400 records.
-That distinction is enforced by a CI gate, not just by intention.
+### Confirmed findings
+
+Per [`CLAUDE.md`](CLAUDE.md), a flag is a measurement until a human confirms
+it. On 2026-09-12 the owner confirmed the 16 datasets carrying a flag that
+indicates an outright recording error and does not depend on the lag
+estimator:
+
+| finding | n | rate | 95 percent Wilson |
+|---|---|---|---|
+| `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
+| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
+| `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
+| **any confirmed finding** | **16/353** | **0.0453** | **[0.0281, 0.0724]** |
+
+**About one dataset in twenty carries a confirmed recording defect.** That
+is a lower bound: `large_lag` at 0.561 and `stuck_state` at 0.351 were held
+out of the confirmation pass and remain unconfirmed measurements. The
+evidence, and the fact that this was a blanket owner sign-off rather than 16
+separate inspections, is recorded in
+[`results/2026-09-12-evidence-16-flagged.md`](results/2026-09-12-evidence-16-flagged.md).
+
+The measurement-versus-finding distinction is enforced by a CI gate, not
+just by intention.
 
 ## What this is
 

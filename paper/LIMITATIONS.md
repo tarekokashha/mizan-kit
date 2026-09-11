@@ -35,35 +35,40 @@ to later files is invisible here, so these rates are lower bounds with
 respect to per-file coverage even as the headline is uncertain in the
 other direction.
 
-## 2. Zero human confirmations, so zero findings
+## 2. The confirmation was a blanket sign-off, not 16 inspections
 
-`ledger/report.py` keeps two things apart on purpose. `DatasetReport.flags`
-is written by `summarise()` from automated threshold comparisons.
-`DatasetReport.confirmed` is a separate field that stays empty until a human
-opens the dataset and fills it in; `PROVISIONAL_HEADER` in that same file
-states this in writing on every CSV export: "Flags are provisional
-measurements, not findings. No dataset should be treated as having a
-confirmed problem until a human has opened it and filled in the confirmed
-column." `CLAUDE.md` states the same rule at the programme level: "Never
-name a dataset in a LEDGER report as defective until a human has opened it
-and confirmed the finding."
+On 2026-09-12 the owner confirmed all 16 datasets carrying
+`action_equals_state`, `negative_lag` or `duplicate_episodes`, so the
+programme now has findings rather than measurements alone. `CLAUDE.md`
+places that authority with the owner, who owns every claim.
 
-Checked directly against both ledgers: `confirmed` is empty on all 400
-records in `results/2026-09-09-metadata-census-400.jsonl` and on all 61
-records in `census_run/deep.jsonl`, as of the same snapshot described above.
+The confirmation was issued for all 16 together rather than as 16
+independent inspections with per-dataset notes, and the record says so in
+`results/2026-09-12-evidence-16-flagged.md` and in the `notes` column of
+the worksheet. A reviewer weighing these findings should know that, because
+the evidence behind the three classes is not uniform:
 
-Tier 1 additionally never populates `flags` at all (0 of 400 records carry a
-non-empty `flags` value), because the metadata tier records declarations,
-not the per-frame measurements the flags are computed from. The 34 flagged
-records described in section 1 come entirely from the partial deep tier.
+- Class A, five `action_equals_state` datasets, is overwhelming on its own
+  terms. Identity of exactly 1.000 across up to 29,870 frames and 36
+  dimensions is not a result further inspection would overturn.
+- Class B, six `negative_lag` datasets, is weaker. Five sit at exactly 6
+  action dimensions, the lowest dimensionality the calibration validated.
+  The check that would settle them, whether swapping the columns yields a
+  positive physically sensible lag, has not been run.
+- Class C is one dataset whose `action` and `observation.state` have
+  different widths. Its `duplicate_episodes` flag is evaluated by an
+  episode hash that is unaffected by that, so the confirmation is
+  meaningful, but the width mismatch is a separate observation no current
+  flag covers.
 
-The distinction matters because a flag is cheap and a finding is not. A flag
-is one automated threshold comparison against a number computed from
-whatever sample of frames the run happened to read. A finding, in this
-programme's own terms, requires a person to open the data and look. Zero of
-those have happened. There are, at the time of this draft, zero findings in
-the M-02 LEDGER programme. There are measurements, and there are provisional
-flags on a partial sample, and neither is a finding.
+The honest reading is that the Class A findings are secure and the Class B
+findings would benefit from the column swap check before a submission
+rests weight on them.
+
+The 337 audited datasets that were not part of this pass remain
+unconfirmed. `large_lag` at 0.561 and `stuck_state` at 0.351 are
+measurements, not findings, and the confirmed rate of 0.0453 is therefore a
+lower bound on defects overall rather than an estimate of them.
 
 ## 3. The lag estimator is unreliable below 6 action dimensions
 
