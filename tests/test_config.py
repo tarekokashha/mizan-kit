@@ -17,6 +17,7 @@ def test_rejects_out_of_range_fraction(tmp_path):
     p.write_text(
         "[thresholds]\nfrac_bad_dt = 1.5\nstuck_state_frac = 0.2\n"
         "identity_frac = 0.5\nlag_large = 3\ndup_episode_frac = 0.0\n"
+        "min_lag_correlation = 0.5\n"
     )
     with pytest.raises(ValueError, match="frac_bad_dt"):
         load_thresholds(p)

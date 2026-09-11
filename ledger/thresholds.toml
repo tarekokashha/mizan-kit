@@ -9,3 +9,13 @@ stuck_state_frac = 0.20
 identity_frac = 0.50
 lag_large = 3
 dup_episode_frac = 0.0
+
+# A lag flag is only raised when the action-state correlation at the best lag
+# is at least this strong. Without it, xcorr_lag returns LAGS[0] = -5 for any
+# dataset whose columns are constant, because every lag scores 0.000 and max()
+# returns the first key, so a dataset with no signal is flagged negative_lag.
+# Measured 2026-09-12 on the 400 dataset census: 4 of 6 negative_lag flags had
+# r_best below 0.1, and 2 large_lag flags did too. 0.5 is chosen so that the
+# two weakest real correlations observed (0.197 and 0.498) are both excluded,
+# while the clean synthetic generator, which correlates above 0.9, is not.
+min_lag_correlation = 0.5

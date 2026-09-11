@@ -58,12 +58,19 @@ estimator:
 | finding | n | rate | 95 percent Wilson |
 |---|---|---|---|
 | `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
-| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
 | `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
-| **any confirmed finding** | **16/353** | **0.0453** | **[0.0281, 0.0724]** |
+| `negative_lag` | 0/353 | 0.0000 | [0.0000, 0.0108] |
+| **any confirmed finding** | **12/353** | **0.0340** | **[0.0196, 0.0585]** |
 
-**About one dataset in twenty carries a confirmed recording defect.** That
-is a lower bound: `large_lag` at 0.561 and `stuck_state` at 0.351 were held
+`negative_lag` is zero because all six of its flags turned out to be an
+artifact. `xcorr_lag` returned the leftmost lag, -5, for any dataset whose
+columns are constant, so datasets with no signal were flagged automatically.
+A correlation gate now prevents that, and the correction is written up in
+[`results/2026-09-12-lag-gate-correction.md`](results/2026-09-12-lag-gate-correction.md).
+It took the confirmed count from 16 to 12.
+
+**About one dataset in thirty carries a confirmed recording defect.** That
+is a lower bound: `large_lag` at 0.530 and `stuck_state` at 0.351 were held
 out of the confirmation pass and remain unconfirmed measurements. The
 evidence, and the fact that this was a blanket owner sign-off rather than 16
 separate inspections, is recorded in

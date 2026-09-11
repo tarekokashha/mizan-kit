@@ -51,10 +51,12 @@ the evidence behind the three classes is not uniform:
 - Class A, five `action_equals_state` datasets, is overwhelming on its own
   terms. Identity of exactly 1.000 across up to 29,870 frames and 36
   dimensions is not a result further inspection would overturn.
-- Class B, six `negative_lag` datasets, is weaker. Five sit at exactly 6
-  action dimensions, the lowest dimensionality the calibration validated.
-  The check that would settle them, whether swapping the columns yields a
-  positive physically sensible lag, has not been run.
+- Class B, six `negative_lag` datasets, was the weakest, and the column
+  swap check has since refuted it entirely. All six were an artifact of
+  `xcorr_lag` returning the leftmost lag when a dataset has no signal.
+  `negative_lag` prevalence is now 0.0000 [0.0000, 0.0108] and four of the
+  sixteen confirmations no longer carry any confirmable flag. See
+  `results/2026-09-12-lag-gate-correction.md`.
 - Class C is one dataset whose `action` and `observation.state` have
   different widths. Its `duplicate_episodes` flag is evaluated by an
   episode hash that is unaffected by that, so the confirmation is
@@ -66,8 +68,8 @@ findings would benefit from the column swap check before a submission
 rests weight on them.
 
 The 337 audited datasets that were not part of this pass remain
-unconfirmed. `large_lag` at 0.561 and `stuck_state` at 0.351 are
-measurements, not findings, and the confirmed rate of 0.0453 is therefore a
+unconfirmed. `large_lag` at 0.530 after the lag gate and `stuck_state` at 0.351 are
+measurements, not findings, and the confirmed rate of 0.0340 is therefore a
 lower bound on defects overall rather than an estimate of them.
 
 ## 3. The lag estimator is unreliable below 6 action dimensions

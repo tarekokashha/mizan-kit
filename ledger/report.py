@@ -199,7 +199,11 @@ def audit_frame(df, fps: float) -> dict:
 
 
 def summarise(
-    repo: str, info: dict | None, parts: list[dict], thresholds: dict | None = None
+    repo: str,
+    info: dict | None,
+    parts: list[dict],
+    thresholds: dict | None = None,
+    min_lag_correlation: float | None = None,
 ) -> DatasetReport:
     """Pool a list of audit_frame() counts dicts into one DatasetReport.
 
@@ -260,7 +264,18 @@ def summarise(
         flags.append("stuck_state")
     if np.isfinite(rep.identity_frac) and rep.identity_frac > th["identity_frac"]:
         flags.append("action_equals_state")
-    if np.isfinite(rep.lag_frames):
+    # A lag flag requires a correlation strong enough for the lag estimate to
+    # mean anything. Without this gate, xcorr_lag reports -5 for any dataset
+    # whose columns are constant: it picks the best lag with
+    # max(scores, key=scores.get), every lag scores identically at 0.000, and
+    # max returns the first key, which is LAGS[0] = -5. The estimator is
+    # defaulting, not detecting, and the dataset is then flagged negative_lag.
+    # Measured on the 2026-09-11 census of 400 datasets: four of the six
+    # negative_lag flags had r_best below 0.1, and two large_lag flags did too.
+    # Passing min_lag_correlation=0.0 disables the gate and reproduces v0.
+    gate = th["min_lag_correlation"] if min_lag_correlation is None else min_lag_correlation
+    lag_is_supported = np.isfinite(rep.r_best) and abs(rep.r_best) >= gate
+    if np.isfinite(rep.lag_frames) and lag_is_supported:
         if rep.lag_frames < 0:
             flags.append("negative_lag")
         elif rep.lag_frames >= th["lag_large"]:

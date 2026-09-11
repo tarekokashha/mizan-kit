@@ -340,7 +340,7 @@ ledgers and the sample record are committed beside it.
 [0.090, 0.153], dominated by 31 cases where no parquet exists at the path
 the declared layout predicts.
 
-Among the 353 audited, the most common flags were `large_lag` at 0.561
+Among the 353 audited, the most common flags were `large_lag` at 0.530
 [0.509, 0.612] and `stuck_state` at 0.351 [0.303, 0.402]. The flags that
 indicate an outright recording error rather than a timing characteristic
 were rare: `duplicate_episodes` 0.020 [0.010, 0.040], `negative_lag` 0.017
@@ -369,13 +369,13 @@ depend on the lag estimator. Over the 353 audited datasets:
 | finding | n | rate | 95 percent Wilson |
 |---|---|---|---|
 | `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
-| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
+| `negative_lag` | 0/353 | 0.0000 | [0.0000, 0.0108] |
 | `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
-| any confirmed finding | 16/353 | 0.0453 | [0.0281, 0.0724] |
+| any confirmed finding | 12/353 | 0.0340 | [0.0196, 0.0585] |
 
-That rate counts only confirmed defects. `large_lag` at 0.561 and
-`stuck_state` at 0.351 were deliberately held out of the confirmation pass
-and remain unconfirmed measurements, so 0.0453 is a lower bound on defects
+That rate counts only confirmed defects. `large_lag` at 0.530 after the lag gate, and
+`stuck_state` at 0.351, were deliberately held out of the confirmation pass
+and remain unconfirmed measurements, so 0.0340 is a lower bound on defects
 overall. The confirmation was a blanket owner sign-off rather than 16
 independent inspections with notes, and the evidence supporting it is in
 `results/2026-09-12-evidence-16-flagged.md`.
@@ -392,12 +392,12 @@ relies on any threshold. It says something plain about the Hub: a
 measurable fraction of published datasets are announcements of data that is
 not there.
 
-The second is the confirmed defect rate, 0.0453 [0.0281, 0.0724] of audited
+The second is the confirmed defect rate, 0.0340 [0.0196, 0.0585] of audited
 datasets, and it needs to be read with its bounds in view. It counts only
 the three flags that indicate an outright recording error and that do not
-depend on the lag estimator. It excludes `large_lag`, measured at 0.561,
+depend on the lag estimator. It excludes `large_lag`, measured at 0.530 after the lag gate,
 and `stuck_state`, at 0.351, both of which remain unconfirmed
-measurements. So roughly one dataset in twenty carries a confirmed
+measurements. So roughly one dataset in thirty carries a confirmed
 recording defect, and a much larger fraction carries something the audit
 noticed but nobody has adjudicated.
 
@@ -417,8 +417,8 @@ from it.
 ## 6. Conclusion
 
 Temporal integrity problems in public robot learning datasets are common
-enough to matter and rare enough to fix. About 4.5 percent of LeRobot
-datasets carry a confirmed recording defect, interval 2.8 to 7.2 percent,
+enough to matter and rare enough to fix. About 3.4 percent of LeRobot
+datasets carry a confirmed recording defect, interval 2.0 to 5.9 percent,
 and a further substantial fraction carries flags that were measured but not
 adjudicated.
 

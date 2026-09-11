@@ -6,6 +6,34 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Corrected
+
+- **All six `negative_lag` flags were an artifact, and the confirmed count
+  drops from 16 to 12.** `xcorr_lag` picks the best lag with
+  `max(scores, key=scores.get)`, and when every lag scores identically,
+  which is what a constant column produces, `max` returns the first key.
+  `LAGS` starts at -5, so any dataset with no signal was reported as lag -5
+  and flagged `negative_lag` automatically. The estimator was defaulting,
+  not detecting. Four of the six had `r_best` below 0.1; eleven `large_lag`
+  flags had the same problem.
+- A lag flag now requires `abs(r_best) >= min_lag_correlation`, default 0.5
+  in `ledger/thresholds.toml`. The value was chosen against the
+  measurements: it excludes the two weakest observed correlations, 0.197 and
+  0.498, and leaves the clean synthetic generator, above 0.9, untouched.
+- `negative_lag` prevalence goes from 0.0170 [0.0078, 0.0366] to 0.0000
+  [0.0000, 0.0108]. `large_lag` from 0.561 to 0.530. Confirmed findings from
+  16/353 = 0.0453 [0.0281, 0.0724] to 12/353 = 0.0340 [0.0196, 0.0585].
+  Four confirmed datasets lost their only confirmable flag.
+- The gate is a deliberate divergence from v0, so `summarise` takes
+  `min_lag_correlation` and passing 0.0 reproduces v0 exactly. The
+  equivalence tests pass 0.0 explicitly, which keeps them equivalence tests.
+- The golden demo report changed in exactly one row: `synthetic/duplicate`
+  loses a spurious `large_lag` it had carried since v0, while
+  `synthetic/swapped` keeps its genuine `negative_lag`. The gate removes the
+  false positive and keeps the true one.
+- Written up in `results/2026-09-12-lag-gate-correction.md`, with the column
+  swap check that exposed it in `results/2026-09-12-column-swap-check.md`.
+
 ### Findings
 
 - The programme has findings rather than measurements alone. On 2026-09-12

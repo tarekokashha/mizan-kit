@@ -172,7 +172,10 @@ def test_report_reproduces_v0_exactly_for_every_defect():
     for defect in DEFECTS:
         df = make_episodes(defect=defect, seed=0)
         v0 = v0_summarise("t", {"fps": 30}, [v0_audit_frame(df, 30.0)])
-        new = summarise("t", {"fps": 30}, [audit_frame(df, 30.0)])
+        # The lag gate is a deliberate divergence from v0 (see summarise).
+        # Disabling it is what makes this an equivalence test rather than a
+        # test that v0 and the current code happen to agree.
+        new = summarise("t", {"fps": 30}, [audit_frame(df, 30.0)], min_lag_correlation=0.0)
         assert new.flags == v0.flags, (
             f"defect={defect!r} flags differ: v0={v0.flags!r} new={new.flags!r}"
         )
@@ -226,7 +229,7 @@ def test_multi_part_pooling_matches_v0_with_unequal_parts():
     )
 
     v0 = v0_summarise("t", {"fps": 30}, v0_parts)
-    new = summarise("t", {"fps": 30}, new_parts)
+    new = summarise("t", {"fps": 30}, new_parts, min_lag_correlation=0.0)
 
     # Self check: a naive mean of each part's own median must actually
     # diverge from v0's correct pooled median, or these part shapes do
@@ -256,3 +259,62 @@ def test_multi_part_pooling_matches_v0_with_unequal_parts():
     )
     for field in numeric_fields:
         _assert_field_equal(getattr(v0, field), getattr(new, field), f"field={field}")
+
+
+# --------------------------------------------------------------------------- #
+# Lag flags must not fire without a correlation to support them.
+#
+# Found 2026-09-12 by the column swap check. xcorr_lag picks the best lag with
+# max(scores, key=scores.get), and when every lag scores identically, max
+# returns the FIRST key. LAGS starts at -5. So a dataset whose action or state
+# is constant, which correlates at 0.000 everywhere, is reported as lag -5 and
+# flagged negative_lag every single time. That is the estimator defaulting, not
+# detecting. Four of the six negative_lag flags in the 400 dataset census had
+# r_best below 0.1.
+# --------------------------------------------------------------------------- #
+def test_degenerate_data_is_not_flagged_negative_lag():
+    """Constant columns correlate at zero, so no lag claim is supportable."""
+    import numpy as np
+    import pandas as pd
+
+    n = 200
+    df = pd.DataFrame(
+        {
+            "timestamp": np.arange(n, dtype=np.float32) / 30.0,
+            "frame_index": np.arange(n, dtype=np.int64),
+            "episode_index": np.zeros(n, dtype=np.int64),
+            "action": [np.zeros(6, dtype=np.float32) for _ in range(n)],
+            "observation.state": [np.zeros(6, dtype=np.float32) for _ in range(n)],
+        }
+    )
+    rep = summarise("s/degenerate", {"codebase_version": "t", "fps": 30}, [audit_frame(df, 30.0)])
+    assert "negative_lag" not in rep.flags, (
+        f"a dataset with zero correlation was flagged on lag: {rep.flags!r}"
+    )
+
+
+def test_a_real_negative_lag_is_still_flagged():
+    """The fix must not silence a genuine transposition."""
+    from ledger.synth import make_episodes
+
+    df = make_episodes(n_eps=2, T=300, defect="swapped", seed=0)
+    rep = summarise("s/swapped", {"codebase_version": "t", "fps": 30}, [audit_frame(df, 30.0)])
+    assert "negative_lag" in rep.flags, "a genuinely swapped dataset must still raise negative_lag"
+
+
+def test_v0_equivalence_is_preserved_with_the_gate_disabled():
+    """The gate is a deliberate divergence from v0, so v0 must be reachable."""
+    import numpy as np
+
+    import tests.v0_reference as v0
+    from ledger.synth import make_episodes
+
+    for defect in ("", "swapped", "duplicate"):
+        df = make_episodes(defect=defect, seed=0)
+        info = {"codebase_version": "demo", "fps": 30}
+        old = v0.summarise("t", info, [v0.audit_frame(df, 30.0)])
+        new = summarise("t", info, [audit_frame(df, 30.0)], min_lag_correlation=0.0)
+        assert old.flags == new.flags, (
+            f"{defect!r}: v0 {old.flags!r} != gate-disabled {new.flags!r}"
+        )
+        assert np.isclose(old.lag_frames, new.lag_frames, equal_nan=True)
