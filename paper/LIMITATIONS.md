@@ -10,40 +10,30 @@ All numbers below are read from the files named next to them. None is
 estimated. Where a number could not be sourced, this document says so
 instead of guessing.
 
-## 1. The deep tier is incomplete
+## 1. The headline rate is unresolved within a factor of two
 
-`census_run/deep.jsonl` is the deep tier ledger. It is a live file: a
-background census process (`census_run/.census.lock` was present and held a
-process id while this document was written) is actively appending to it. Two
-counts taken minutes apart during the drafting of this document were 53 and
-58 raw lines. The count used in this document is a single snapshot, not a
-final number.
+The deep tier completed on 2026-09-11, 353 of 400 datasets audited. That
+removes the earlier incompleteness limitation and replaces it with a
+sharper one.
 
-At that snapshot: 61 raw JSON lines, 56 unique repository keys (5 repository
-names appear twice in the ledger; whether that is a legitimate re-audit
-after a revision change on the Hub or a resume gap is not determined here).
-All 61 records used `StreamingSource`. 7 records carry a non-empty `error`
-field. 34 of the 61 records carry at least one non-empty automated flag.
+Any flag was raised for 0.674 [0.624, 0.721] of audited datasets. But 106
+of the 238 flagged carry `large_lag` and nothing else, and `large_lag` is
+the flag this kit's own calibration shows to be least trustworthy: below 6
+action dimensions the lag estimator does not reliably resolve the argmax,
+and the median Hub dataset is small. Excluding datasets flagged only by
+`large_lag` gives 0.374 [0.325, 0.426].
 
-This is far short of either sample size on record for a deep tier run:
-`docs/superpowers/specs/2026-09-05-ledger-census-design.md` states a default
-deep tier sample size of 800, and `ledger/census.py`'s `CensusConfig` also
-defaults `sample_size` to 800. No completed deep tier run, at any sample
-size, exists in this repository as of this draft. No prevalence rate and no
-Wilson interval for any deep tier flag is reported anywhere in this
-programme's paper. Any such number would be provisional twice over: once
-because the sample is partial, and again because a partial, non-random-feeling
-prefix of an in-progress run is not the same as a completed seeded draw.
+So the honest statement is that somewhere between roughly a third and
+roughly two thirds of LeRobot datasets show a temporal irregularity, and
+this run does not narrow it further. Neither interval should be quoted on
+its own. Resolving it requires recording action dimensionality per dataset
+and stratifying, or improving the estimator, and that work has not been
+done.
 
-A further gap: the completed tier 1 census (`results/2026-09-09-metadata-census-400.jsonl`,
-400 repositories) and the in-progress deep tier ledger share zero
-repositories, checked directly (0 of 56 unique deep tier repos appear among
-the 400 tier 1 repos). The deep tier is therefore not, at least not yet
-verifiably, a deeper look at the same 400 datasets tier 1 already
-described. It appears to be a separate seeded draw against a separately
-fetched Hub frame, run with a different sample size than tier 1's completed
-400. This means the tier 1 descriptive numbers in `DRAFT.md` and the deep
-tier flags in this section cannot currently be joined dataset by dataset.
+A second bound: one parquet file per dataset was read. A defect confined
+to later files is invisible here, so these rates are lower bounds with
+respect to per-file coverage even as the headline is uncertain in the
+other direction.
 
 ## 2. Zero human confirmations, so zero findings
 

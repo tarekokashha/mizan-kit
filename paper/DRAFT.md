@@ -220,25 +220,39 @@ directly, will be wrong for some real datasets on the Hub.
 
 ### 4.2 Tier 2: deep temporal audit
 
-**Pending.** This is the tier that would produce an actual temporal
-integrity measurement, and it is not complete. As a snapshot taken while
-writing this draft, `census_run/deep.jsonl` held 61 raw records covering
-56 unique repositories (5 repository names appear twice in the ledger), 34
-of which carry at least one automated flag and 7 of which carry a
-recorded error. `census_run/.census.lock` was present at the time of this
-snapshot, meaning the run was still active. This is well short of either
-sample size on record for a deep tier run (800, the `CensusConfig`
-default, or 400, the size tier 1 actually used). No prevalence rate and no
-confidence interval is reported for the deep tier in this draft: a rate
-computed from a partial, still-growing sample is not a number this
-programme is willing to publish as a measurement, and it will move as the
-run continues. See `paper/LIMITATIONS.md` section 1 for the full
-accounting, including that this partial sample currently shares zero
-repositories with the completed tier 1 sample of 400.
+The deep tier ran to completion on 2026-09-11 over the same recorded
+sample as the metadata tier above. Provenance, integrity checks and the
+full tables are in `results/2026-09-11-census-400-both-tiers.md`; the raw
+ledgers and the sample record are committed beside it.
 
-No flag from either tier has been confirmed by a human opening the
-corresponding dataset. Per `CLAUDE.md`, that means there are zero findings
-to report here, only provisional, automated flags on an incomplete sample.
+353 of 400 datasets were audited. 47 could not be, rate 0.117
+[0.090, 0.153], dominated by 31 cases where no parquet exists at the path
+the declared layout predicts.
+
+Among the 353 audited, the most common flags were `large_lag` at 0.561
+[0.509, 0.612] and `stuck_state` at 0.351 [0.303, 0.402]. The flags that
+indicate an outright recording error rather than a timing characteristic
+were rare: `duplicate_episodes` 0.020 [0.010, 0.040], `negative_lag` 0.017
+[0.008, 0.037], `action_equals_state` 0.014 [0.006, 0.033].
+
+The headline rate is not reportable as a single number. Any flag was
+raised for 0.674 [0.624, 0.721] of audited datasets, but 106 of those
+carry `large_lag` alone, and `large_lag` is the flag the calibration in
+`docs/calibration.md` shows to be least reliable below 6 action
+dimensions. Excluding datasets flagged only by `large_lag` gives 0.374
+[0.325, 0.426]. The true rate lies somewhere across that span, and this
+run does not settle where. Reporting 0.674 without that caveat would
+misrepresent the evidence.
+
+One result is validated across both tiers independently. Of the 34
+datasets that tier 1 recorded as declaring zero episodes, 29 had no
+parquet at the derived path, giving P(no parquet | declares zero
+episodes) = 0.853 [0.699, 0.936]. Two datasets fail the other way,
+declaring episodes while no parquet is present where the declared layout
+says it should be.
+
+**Still pending.** No human has confirmed any flag, so the programme has
+measurements and no findings; see `paper/LIMITATIONS.md`.
 
 ## 5. Discussion
 

@@ -6,6 +6,24 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Results
+
+- First fully auditable census: 400 datasets, both tiers, one recorded
+  sample, frame of 75,750 fingerprinted by sha256. Integrity verified
+  rather than assumed: 400 unique records per tier, zero duplicates, both
+  tiers covering exactly the declared sample. Written up in
+  `results/2026-09-11-census-400-both-tiers.md` with the raw ledgers and
+  the sample record committed beside it.
+- The headline rate is deliberately not reported as a single number. Any
+  flag was raised for 0.674 [0.624, 0.721] of audited datasets, but 106 of
+  those carry `large_lag` alone and that is the flag the calibration shows
+  to be least reliable below 6 action dimensions. Excluding them gives
+  0.374 [0.325, 0.426]. The evidence supports a range, not a point.
+- One result validated across both tiers independently: a dataset that
+  declares zero episodes usually has no parquet at the derived path,
+  P = 0.853 [0.699, 0.936]. Two datasets fail the other way, declaring
+  episodes while no parquet is present.
+
 ### Added
 
 - `ledger.paths` understands a third layout, `sharded`, whose template is
