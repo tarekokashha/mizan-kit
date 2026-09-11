@@ -14,6 +14,9 @@ ledger_report.csv
 census_out/
 *.jsonl
 !ledger_report_sample.csv
+# results/ is the programme's append only log, per CLAUDE.md. Census
+# output committed there is evidence, not a regenerable build artifact.
+!results/*.jsonl
 
 # HF cache if ever pointed here
 .hf_cache/
