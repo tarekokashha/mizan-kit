@@ -5,6 +5,26 @@ dataset's `meta/info.json` and records what it declares. It does not open any
 parquet, so nothing here is a temporal integrity finding. The deep tier has
 not been run.
 
+
+## Correction, 2026-09-11
+
+These results stand as a valid random sample of the LeRobot population as
+it stood on 2026-09-09. One property claimed for them does not hold.
+
+`draw_sample` drew indices into the sorted frame, so which datasets were
+selected depended on the frame's length, and the Hub population grows
+daily. The seed and size therefore do not identify this sample: re running
+`draw_sample(frame, 400, 20260905)` on a later day returns almost entirely
+different datasets. Measured overlap between this sample and a draw two
+days later was 3 of 400.
+
+The sampler has been fixed to rank each repo by a hash of its own id and
+the seed, which is stable under population growth. But the frame that
+produced the sample below was never recorded, so this particular sample
+cannot be reconstructed after the fact. Its members are exactly the 400
+repositories listed in the accompanying `.jsonl`, and that file is now the
+only record of who was in it.
+
 ## Method
 
 - Frame: every dataset the Hub returns for the LeRobot filter, paginated.

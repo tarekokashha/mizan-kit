@@ -258,7 +258,37 @@ trial," and it is recorded here plainly rather than hidden.
 - The sample was nonetheless fixed in advance: seed 20260905, size
   400, drawn by `draw_sample`, which sorts the frame first so the draw
   does not depend on Hub ordering (Section 3). The deep tier audits
-  that same pre-drawn sample, not a fresh one.
+  that same pre-drawn sample, not a fresh one. THIS CLAIM WAS FALSE WHEN
+  WRITTEN AND IS CORRECTED BELOW.
+
+- Correction, 2026-09-11. The sentence above was wrong, and the error was
+  in the sampler rather than in the wording. `draw_sample` drew INDICES
+  into the sorted frame, so membership depended on the frame's length.
+  The Hub population grows daily, so the tier 1 run of 2026-09-09 and the
+  deep run of 2026-09-11, both declaring seed 20260905 and size 400,
+  drew almost disjoint samples: the measured overlap was 3 of 400. A seed
+  that does not identify a sample cannot support a pre registered claim,
+  which is the entire reason the draw is seeded.
+
+  `draw_sample` now ranks each repo by a hash of its own id and the seed
+  and takes the lowest ranks, so membership depends only on the id and
+  the seed, never on how many other datasets exist. The same growth that
+  previously turned the sample over almost completely now leaves 380 of
+  400 members in place, and a smaller draw is an exact prefix of a larger
+  one.
+
+  Consequences, stated plainly rather than buried:
+  - The tier 1 results in `results/2026-09-09-metadata-census-400.md`
+    remain a valid random sample of the population as it stood that day.
+    What they are not is reproducible from the seed alone, because the
+    frame that produced them was never recorded.
+  - The deep tier data collected before this correction is not a sample
+    of anything defensible. It mixes two draws and two concurrent runs.
+    It is quarantined at
+    `results/invalid/2026-09-11-deep-INVALID-two-samples.jsonl` rather
+    than deleted, and no claim rests on it.
+  - Any future run must record its frame, or a hash and size of it,
+    beside its results. A seed alone was never sufficient.
 - So the substance of pre-registration, a sample fixed before it was
   looked at, was honoured even though the artifact recording it, this
   file, was not committed first.

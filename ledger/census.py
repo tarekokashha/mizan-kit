@@ -9,11 +9,14 @@ spends any bandwidth on it. The deep tier samples actual parquet data
 through a SampleSource and runs the full audit via ledger.report, one
 DatasetReport per dataset.
 
-Sampling is seeded and sorts the frame before drawing, so a draw does
-not depend on the order the Hub happened to return datasets in: only
-the sorted frame and the seed determine the result. That is what makes
-the resulting prevalence table a pre-registered claim, in the same
-spirit as protocols/PROTOCOL_TEMPLATE.md, rather than a post hoc one.
+Sampling ranks each repo by a hash of its own id and the seed and takes
+the lowest ranks, so membership depends only on the id and the seed:
+not on how many other datasets exist, and not on the order the Hub
+returned them. That is what makes the resulting prevalence table a pre
+registered claim, in the same spirit as protocols/PROTOCOL_TEMPLATE.md,
+rather than a post hoc one. An earlier version drew indices into the
+sorted frame, which silently failed that promise as the Hub population
+grew; see draw_sample for the measurement that exposed it.
 Every reported rate carries a Wilson confidence interval from
 cairo_protocol.stats; prevalence() never returns a bare rate.
 
@@ -43,14 +46,13 @@ judgement recorded on DatasetReport.confirmed, per ledger.report.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-
-import numpy as np
 
 from cairo_protocol.stats import wilson_interval
 from ledger.paths import layout_family, packed_sample_is_partial
@@ -136,20 +138,48 @@ def build_frame(client, max_datasets: int | None = None) -> list[str]:
     return repos
 
 
-def draw_sample(frame: list[str], size: int, seed: int) -> list[str]:
-    """Deterministic, order independent sample of `size` ids from frame.
+def _sample_rank(repo: str, seed: int) -> bytes:
+    """Where a repo sorts in a draw. A pure function of its id and the seed."""
+    return hashlib.blake2b(f"{seed}:{repo}".encode(), digest_size=16).digest()
 
-    The frame is sorted before sampling, so the draw does not depend on
-    the order the Hub happened to return datasets in, only on the
-    sorted frame and the seed. Returning fewer than `size` items when
-    the frame itself is smaller is correct, not an error.
+
+def draw_sample(frame: list[str], size: int, seed: int) -> list[str]:
+    """Stable, order independent sample of `size` ids from frame.
+
+    Each repo is ranked by a hash of its own id and the seed, and the
+    lowest `size` ranks are taken. Whether a given dataset is in the
+    sample therefore depends only on its id and the seed, never on how
+    many other datasets exist or on the order the Hub returned them.
+
+    This replaces an index draw, which was wrong in a way that mattered.
+    The previous version sorted the frame and asked a seeded generator
+    for `size` indices into it. Indices are positions, so when the Hub
+    population grew between two runs every position addressed a
+    different repo and the same seed produced an almost entirely
+    different sample. Measured on 2026-09-11: a tier 1 run and a deep
+    run, both declaring "seed 20260905, size 400", overlapped in 3 of
+    400 datasets. A seed that does not identify a sample cannot support
+    a pre-registered prevalence claim, which is the whole reason the
+    draw is seeded.
+
+    Three properties follow, each covered by a test:
+
+    - Growth safe. Adding datasets to the Hub cannot evict an existing
+      member except at the selection boundary, where a newcomer may
+      outrank it. Turnover is proportional to how many new ids hash
+      below the cutoff, not total.
+    - Nested. draw_sample(f, 50, s) is exactly the first 50 of
+      draw_sample(f, 100, s), so a run that stops early is a genuine
+      prefix of the planned sample rather than a different one.
+    - Order free. Only ids and the seed matter, so the Hub's ordering
+      cannot influence the draw.
+
+    Hash order is unrelated to any property of a dataset, so a prefix of
+    an interrupted run is still a random subsample. Duplicate ids in the
+    frame are collapsed: a frame is a set of candidates, not a multiset.
+    Returning fewer than `size` when the frame is smaller is correct.
     """
-    ordered = sorted(frame)
-    if size >= len(ordered):
-        return ordered
-    rng = np.random.default_rng(seed)
-    idx = rng.choice(len(ordered), size=size, replace=False)
-    return [ordered[i] for i in idx]
+    return sorted(set(frame), key=lambda repo: _sample_rank(repo, seed))[:size]
 
 
 def _is_rate_limited_error(error: str) -> bool:

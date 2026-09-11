@@ -519,3 +519,39 @@ def test_prevalence_empty_reports_is_nan_not_a_crash():
 
     rate, lo, hi = prevalence([], "stuck_state")
     assert math.isnan(rate) and math.isnan(lo) and math.isnan(hi)
+
+
+# --------------------------------------------------------------------------- #
+# Sample stability. Found 2026-09-11: draw_sample picked indices into the
+# sorted frame, so when the Hub population grew between two runs the same
+# seed and size produced an almost entirely different sample. The tier 1
+# run of 2026-09-09 and the deep run of 2026-09-11 overlapped in 3 of 400
+# datasets while both claiming to be "seed 20260905, size 400". A seed that
+# does not identify a sample cannot support a pre-registered claim.
+# --------------------------------------------------------------------------- #
+def test_sample_survives_the_frame_growing():
+    """New datasets appearing on the Hub must not reshuffle the draw."""
+    base = [f"user{i:05d}/ds" for i in range(2000)]
+    grown = base + [f"newuser{i:03d}/ds" for i in range(200)]
+    a = set(draw_sample(base, 200, seed=20260905))
+    b = set(draw_sample(grown, 200, seed=20260905))
+    # A new dataset may displace one at the selection boundary, but the
+    # sample must not turn over wholesale the way an index draw does.
+    assert len(a & b) >= 150, f"only {len(a & b)} of 200 survived the frame growing"
+
+
+def test_sample_is_unchanged_when_the_frame_is_only_reordered():
+    frame = [f"o/d{i}" for i in range(500)]
+    assert draw_sample(frame, 50, 7) == draw_sample(list(reversed(frame)), 50, 7)
+
+
+def test_sample_depends_on_the_seed():
+    frame = [f"o/d{i}" for i in range(500)]
+    assert set(draw_sample(frame, 50, 1)) != set(draw_sample(frame, 50, 2))
+
+
+def test_a_smaller_request_is_a_prefix_of_a_larger_one():
+    """Nesting: asking for 50 must give the first 50 of the 100 draw, so a
+    run that stops early is a genuine subsample of the planned one."""
+    frame = [f"o/d{i}" for i in range(500)]
+    assert draw_sample(frame, 50, 3) == draw_sample(frame, 100, 3)[:50]
