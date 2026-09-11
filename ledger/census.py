@@ -118,6 +118,39 @@ def census_lock(out_dir, force: bool = False):
             path.unlink()
 
 
+def write_sample_record(out_dir, frame: list[str], size: int, seed: int) -> dict:
+    """Record which datasets a run drew, and what it drew them from.
+
+    A seed alone never identified a sample. It identified a sample given a
+    frame, and the frame is a live population that grows daily and was
+    thrown away after each run. That is what let the 2026-09-11 sampler
+    bug stay invisible: two runs declared the same seed and size, drew
+    almost disjoint samples, and nothing on disk contradicted them.
+
+    So a run leaves behind the seed, the size, the frame's size and
+    sha256, and the drawn sample in full. The hash is over the sorted
+    unique ids, so it is a fingerprint of the population itself rather
+    than of the order the Hub happened to return it in: two runs of the
+    same population agree, and a population that gained or lost a dataset
+    is visibly different. Together these make a prevalence claim auditable
+    by someone who was not there, which is the point of pre-registering
+    the draw at all.
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    canonical = "\n".join(sorted(set(frame))).encode()
+    record = {
+        "seed": seed,
+        "size": size,
+        "frame_size": len(set(frame)),
+        "frame_sha256": hashlib.sha256(canonical).hexdigest(),
+        "drawn_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "sample": draw_sample(frame, size, seed),
+    }
+    (out_dir / "sample.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return record
+
+
 def _key(repo: str, revision: str = "") -> str:
     """The repo@revision key both the ledger and load_done use."""
     return f"{repo}@{revision}"

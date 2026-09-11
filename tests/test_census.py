@@ -555,3 +555,44 @@ def test_a_smaller_request_is_a_prefix_of_a_larger_one():
     run that stops early is a genuine subsample of the planned one."""
     frame = [f"o/d{i}" for i in range(500)]
     assert draw_sample(frame, 50, 3) == draw_sample(frame, 100, 3)[:50]
+
+
+# --------------------------------------------------------------------------- #
+# Frame recording. The 2026-09-11 sampler bug was invisible because nothing
+# recorded which datasets a run actually drew. A seed alone never identified
+# a sample: it identified a sample given a frame, and the frame was a live,
+# growing population that was thrown away after each run. A run must leave
+# behind enough to reconstruct and audit its own sample.
+# --------------------------------------------------------------------------- #
+def test_a_run_records_the_frame_it_drew_from(tmp_path):
+    from ledger.census import write_sample_record
+
+    frame = [f"o/d{i}" for i in range(500)]
+    rec = write_sample_record(tmp_path, frame, size=20, seed=7)
+    written = json.loads((tmp_path / "sample.json").read_text(encoding="utf-8"))
+
+    assert written["seed"] == 7
+    assert written["size"] == 20
+    assert written["frame_size"] == 500
+    assert len(written["sample"]) == 20
+    assert written["sample"] == draw_sample(frame, 20, 7)
+    assert len(written["frame_sha256"]) == 64
+    assert rec == written
+
+
+def test_the_frame_hash_changes_when_the_population_changes(tmp_path):
+    from ledger.census import write_sample_record
+
+    a = write_sample_record(tmp_path / "a", [f"o/d{i}" for i in range(100)], 10, 1)
+    b = write_sample_record(tmp_path / "b", [f"o/d{i}" for i in range(101)], 10, 1)
+    assert a["frame_sha256"] != b["frame_sha256"], "a changed population must be visible"
+
+
+def test_the_frame_hash_ignores_hub_ordering(tmp_path):
+    from ledger.census import write_sample_record
+
+    frame = [f"o/d{i}" for i in range(100)]
+    a = write_sample_record(tmp_path / "a", frame, 10, 1)
+    b = write_sample_record(tmp_path / "b", list(reversed(frame)), 10, 1)
+    assert a["frame_sha256"] == b["frame_sha256"]
+    assert a["sample"] == b["sample"]

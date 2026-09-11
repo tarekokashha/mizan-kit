@@ -69,7 +69,7 @@ import numpy as np
 from ledger.census import (
     CensusConfig,
     build_frame,
-    draw_sample,
+    write_sample_record,
 )
 from ledger.census import (
     run_census as run_census_tiers,
@@ -340,7 +340,17 @@ def run_census(args) -> int:
         client = getattr(source, "client", None) or HubClient()
         frame = build_frame(client)
 
-    sample = draw_sample(frame, args.sample_size, args.seed)
+    # Record the frame alongside the results. A seed alone does not
+    # identify a sample: it identifies a sample given a frame, and the
+    # frame is a live population. Writing it down is what makes the
+    # prevalence claim auditable by someone who was not there.
+    record = write_sample_record(out_dir, frame, args.sample_size, args.seed)
+    sample = record["sample"]
+    print(
+        f"sample: {len(sample)} of {record['frame_size']} datasets, "
+        f"seed {record['seed']}, frame sha256 {record['frame_sha256'][:12]}",
+        file=sys.stderr,
+    )
     # tier lives only on cfg from here on: which tiers actually run is
     # decided by ledger.census.run_census reading cfg.tier, not by this
     # function branching on args.census itself.
