@@ -115,3 +115,60 @@ def test_estimate_counts():
 def test_unknown_template_raises():
     with pytest.raises(ValueError, match="data_path"):
         derive_paths({"codebase_version": "v9", "data_path": "weird/{nope}.parquet"})
+
+
+# --------------------------------------------------------------------------- #
+# The sharded layout, found in the wild by the 2026-09-09 census.
+# saaduddinM/OXE_berkeley_autolab_ur5_embeddings declares
+# codebase_version "v2.1-embeddings-sharded" with a shard template. It is
+# ordinary parquet, just a third naming scheme, and num_shards is right
+# there in info.json, so the file list is exactly derivable.
+# --------------------------------------------------------------------------- #
+SHARDED = {
+    "codebase_version": "v2.1-embeddings-sharded",
+    "chunks_size": 1000,
+    "total_episodes": 896,
+    "num_shards": 64,
+    "data_path": "data/shard-{shard_id:05d}-of-{num_shards:05d}.parquet",
+}
+
+
+def test_sharded_is_its_own_family():
+    assert layout_family(SHARDED) == "sharded"
+
+
+def test_sharded_file_count_is_num_shards():
+    assert estimate_file_count(SHARDED) == 64
+
+
+def test_sharded_paths_are_derived_exactly():
+    p = derive_paths(SHARDED, limit=None)
+    assert len(p) == 64
+    assert p[0] == "data/shard-00000-of-00064.parquet"
+    assert p[63] == "data/shard-00063-of-00064.parquet"
+
+
+def test_sharded_honours_a_limit():
+    assert derive_paths(SHARDED, limit=3) == [
+        "data/shard-00000-of-00064.parquet",
+        "data/shard-00001-of-00064.parquet",
+        "data/shard-00002-of-00064.parquet",
+    ]
+
+
+def test_sharded_without_num_shards_is_still_unrecognised():
+    """num_shards is what makes the template derivable. Without it the
+    honest answer is that we cannot enumerate the files, not a guess."""
+    broken = dict(SHARDED)
+    del broken["num_shards"]
+    # The family is still recognised from the template; what is missing is
+    # the count needed to enumerate. Assert on that specific message, not
+    # on the substring "num_shards", which the template itself contains.
+    assert layout_family(broken) == "sharded"
+    with pytest.raises(ValueError, match="needs num_shards in info.json"):
+        derive_paths(broken, limit=None)
+
+
+def test_sharded_is_not_partial():
+    """Unlike packed, a sharded listing is exact, so nothing is missing."""
+    assert packed_sample_is_partial(SHARDED, limit=None, has_exists=False) is False

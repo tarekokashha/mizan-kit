@@ -6,6 +6,18 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `ledger.paths` understands a third layout, `sharded`, whose template is
+  `data/shard-{shard_id:05d}-of-{num_shards:05d}.parquet`. Found in the wild
+  by the 2026-09-09 census, which recorded four datasets declaring a layout
+  no reader here could follow. This is the one of the four that was
+  recoverable: it is ordinary parquet and `num_shards` is declared in
+  `info.json`, so the file list is exact rather than probed, like
+  `per_episode` and unlike `packed`. The other three declare
+  `codebase_version: v3.0` while shipping a `.tsfile`, which is not parquet
+  at all and stays unreadable by design.
+
 ### Fixed
 
 - A census output directory is now locked for the duration of a run.

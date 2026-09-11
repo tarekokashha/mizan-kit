@@ -25,12 +25,20 @@ def layout_family(info: dict) -> str:
         return "per_episode"
     if "file_index" in tmpl and "chunk_index" in tmpl:
         return "packed"
+    if "shard_id" in tmpl and "num_shards" in tmpl:
+        return "sharded"
     raise ValueError(f"unrecognised data_path template: {tmpl!r}")
 
 
 def estimate_file_count(info: dict) -> int | None:
-    if layout_family(info) == "per_episode":
+    family = layout_family(info)
+    if family == "per_episode":
         return int(info.get("total_episodes", 0))
+    if family == "sharded":
+        # num_shards is declared in info.json, so unlike packed this count
+        # is exact rather than unknowable without probing.
+        shards = info.get("num_shards")
+        return int(shards) if shards is not None else None
     return None
 
 
@@ -73,6 +81,23 @@ def derive_paths(
         if limit is not None:
             n = min(n, limit)
         return [tmpl.format(episode_chunk=e // chunk, episode_index=e) for e in range(n)]
+    if family == "sharded":
+        # Exact, like per_episode and unlike packed: num_shards is declared,
+        # so the whole file list is derivable with no probing and nothing
+        # is ever silently missing. Found in the wild by the 2026-09-09
+        # census, which recorded four datasets whose layout no reader here
+        # could follow; this is the one of them that was recoverable.
+        shards = info.get("num_shards")
+        if shards is None:
+            raise ValueError(
+                "sharded data_path needs num_shards in info.json to enumerate "
+                f"its files, and this one does not declare it: {tmpl!r}"
+            )
+        n = int(shards)
+        total = n
+        if limit is not None:
+            n = min(n, limit)
+        return [tmpl.format(shard_id=i, num_shards=total) for i in range(n)]
     if limit is None and exists is not None:
         paths: list[str] = []
         f = 0
