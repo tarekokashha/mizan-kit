@@ -8,6 +8,18 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- `docs/flag-audit.md`: every flag checked against whether it can separate
+  its innocent cause from its fault cause. Four of the eight failed. Two
+  more, `bad_dt` and `frame_gaps`, fail on inspection and are not yet
+  checked empirically.
+- `CLAUDE.md` gains four rules for writing a check, each one derived from a
+  defect found this session rather than from principle.
+- `action_episode_hash`: hashes the whole action array. `action_head_hash`
+  looked at the first 50 frames, so episodes sharing a home pose hashed
+  identically however differently they ended. Four fully divergent episodes
+  sharing a 60 frame home pose scored `dup_episode_frac` 0.750 and raised
+  the flag. The census predates the fix, so its 7 `duplicate_episodes`
+  instances are unverified under the corrected check.
 - `stuck_while_commanded` in `ledger/checks.py`: the fraction of frames where
   `observation.state` is frozen while `action` is not. This is the
   companion measurement `stuck_state` needed and the one that actually

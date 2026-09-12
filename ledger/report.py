@@ -59,7 +59,13 @@ from pathlib import Path
 
 import numpy as np
 
-from ledger.checks import action_head_hash, episode_stats, run_checks, xcorr_lag
+from ledger.checks import (
+    action_episode_hash,
+    action_head_hash,
+    episode_stats,
+    run_checks,
+    xcorr_lag,
+)
 from ledger.config import DEFAULT_THRESHOLDS
 
 PROVISIONAL_HEADER = (
@@ -112,7 +118,7 @@ class DatasetReport:
     stack_errors: int = 0
 
 
-def audit_frame(df, fps: float) -> dict:
+def audit_frame(df, fps: float, head_hash: bool = False) -> dict:
     """Run every check on a dataframe holding one or more episodes.
 
     Returns one counts dict for the whole dataframe, matching
@@ -192,7 +198,11 @@ def audit_frame(df, fps: float) -> dict:
                 out["lags"].append(lag)
                 out["r0"].append(r0)
                 out["rb"].append(rb)
-        h = action_head_hash(stats, n=50)
+        # Whole-episode hash, not v0's first-50-frames hash. Episodes that
+        # share a home pose are not duplicates; see
+        # ledger.checks.action_episode_hash. head_hash is kept for the v0
+        # equivalence path, which audit_frame reaches with head_hash=True.
+        h = action_head_hash(stats, n=50) if head_hash else action_episode_hash(stats)
         if h is not None:
             out["hashes"].append(h)
     return out

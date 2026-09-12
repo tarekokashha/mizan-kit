@@ -156,7 +156,7 @@ Per episode, then pooled per dataset:
 | `stuck_state` | consecutive observations bit identical. Not on its own a defect: see the limitation below |
 | `action_equals_state` | `action == observation.state` exactly, the "action is just the state" recording bug |
 | `large_lag` / `negative_lag` | the lag at which action best predicts state is large, or inverted |
-| `duplicate_episodes` | episodes whose opening frames hash identically |
+| `duplicate_episodes` | episodes whose whole action array hashes identically |
 
 Aggregation is **pooled**, `sum(numerator) / sum(denominator)` across parts,
 never a mean of per episode fractions. Those two differ whenever episodes
@@ -350,6 +350,13 @@ Stated plainly, because a research kit that hides these is worse than none.
 - **400 of 75,750** is about 0.53 percent, run anonymously.
 - **About 1 percent of datasets declare a layout no reader can follow**, and
   are excluded from any parquet level claim.
+- **The 7 `duplicate_episodes` findings are unverified under the corrected
+  check.** Until 2026-09-12 the duplicate detector hashed only the first 50
+  action frames, so episodes sharing a home pose hashed identically however
+  differently they ended. Measured: four fully divergent episodes sharing a
+  60 frame home pose scored 0.750 and raised the flag. It now hashes the
+  whole episode, but the census predates that, so those 7 may or may not
+  survive. Re-running the deep tier would settle it.
 - **`stuck_state` at 0.351 is not a defect rate.** The flag fires on bit
   identical consecutive observations, which happens both when an encoder
   reports the same quantised value during a deliberate hold, which is
@@ -362,6 +369,11 @@ Stated plainly, because a research kit that hides these is worse than none.
   analysis in
   [`results/2026-09-12-stuck-state-check.md`](results/2026-09-12-stuck-state-check.md).
 - **`lerobot_ur` is a skeleton** that has produced no robot number.
+
+Every flag is audited against whether it can separate its innocent cause
+from its fault cause in [`docs/flag-audit.md`](docs/flag-audit.md). Four of
+the eight failed that test. Two more, `bad_dt` and `frame_gaps`, fail it on
+inspection and have not yet been checked empirically.
 
 Full detail in [`paper/LIMITATIONS.md`](paper/LIMITATIONS.md).
 

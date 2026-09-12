@@ -51,6 +51,41 @@ can run without touching hardware.
   authors' own."
 - No em dashes in any prose. Plain sentences.
 
+## Rules for a check, added 2026-09-12
+
+Three flags were examined in one session and all three were found to be
+measuring something other than what their name claimed. `negative_lag` fired
+on any dataset with no signal, because the estimator returns the leftmost
+candidate lag when every lag scores identically. `large_lag` is unreliable
+below 6 action dimensions, which is where most of the Hub sits.
+`stuck_state` fires on a condition that is innocent roughly 80 percent of the
+time. These rules exist so that the next check does not repeat it.
+
+- **A check must be able to distinguish its innocent cause from its fault
+  cause, or it reports a condition and not a defect.** Bit identical
+  consecutive observations have two causes, an arm deliberately holding still
+  and a state failing to follow a command, and a check that cannot separate
+  them may not be described as finding a fault. Where a companion
+  measurement can separate them, add it. Where none exists, say in the
+  report that the flag names a condition.
+
+- **A threshold is calibrated only when the sweep demonstrates the flag
+  firing on the condition, not merely failing to fire on clean data.**
+  `docs/calibration.md` reported 0 false positives for `stuck_state_frac`
+  across 450 configurations while the generator was structurally incapable
+  of producing the condition. A one sided sweep is not calibration.
+
+- **An estimator must return nan rather than a default when its input cannot
+  support an answer.** `xcorr_lag` returned a lag of -5 for data with zero
+  correlation because `max` returns the first key on ties. Silence is
+  correct there; a number is not.
+
+- **A confirmation is per dataset and carries a note saying what was seen.**
+  A blanket sign-off over a set of flagged datasets is recorded as such, and
+  four of sixteen such confirmations turned out to rest on a flag the fixed
+  code does not raise. The `confirmed` column without a `notes` entry is not
+  a confirmation.
+
 ## Definition of done for a task
 
 Code runs from a clean checkout with the command written in the task; tests

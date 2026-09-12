@@ -142,9 +142,40 @@ def xcorr_lag(action, state, lags: Iterable[int] = LAGS):
 
 
 def action_head_hash(s: EpisodeStats, n: int = 50) -> str | None:
+    """Hash of the first n action frames. v0's duplicate detector.
+
+    Kept for the v0 equivalence tests and reachable by passing n. It is not
+    what the duplicate flag should use: see action_episode_hash.
+    """
     if s.action is None:
         return None
     return hashlib.md5(np.round(s.action[:n], 4).tobytes()).hexdigest()
+
+
+def action_episode_hash(s: EpisodeStats) -> str | None:
+    """Hash of the WHOLE action array, which is what duplication means.
+
+    action_head_hash looked at the first 50 frames only, so episodes that
+    begin from a shared home pose hashed identically however differently
+    they ended. Robot episodes routinely start from a home pose, so that is
+    a common false positive rather than an exotic one. Measured on
+    2026-09-12: four fully divergent episodes sharing a 60 frame home pose
+    gave dup_episode_frac 0.750 and raised the flag.
+
+    Two episodes are duplicates when they are the same episode, which is a
+    statement about all of their frames. Hashing all of them is both the
+    correct check and no more expensive, since the array is already in
+    memory.
+
+    Length is folded in first, so two episodes of different length can never
+    collide on a shared prefix.
+    """
+    if s.action is None:
+        return None
+    h = hashlib.md5()
+    h.update(str(len(s.action)).encode())
+    h.update(np.round(s.action, 4).tobytes())
+    return h.hexdigest()
 
 
 @register("frac_bad_dt")

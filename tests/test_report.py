@@ -175,7 +175,9 @@ def test_report_reproduces_v0_exactly_for_every_defect():
         # The lag gate is a deliberate divergence from v0 (see summarise).
         # Disabling it is what makes this an equivalence test rather than a
         # test that v0 and the current code happen to agree.
-        new = summarise("t", {"fps": 30}, [audit_frame(df, 30.0)], min_lag_correlation=0.0)
+        new = summarise(
+            "t", {"fps": 30}, [audit_frame(df, 30.0, head_hash=True)], min_lag_correlation=0.0
+        )
         assert new.flags == v0.flags, (
             f"defect={defect!r} flags differ: v0={v0.flags!r} new={new.flags!r}"
         )
@@ -223,7 +225,7 @@ def test_multi_part_pooling_matches_v0_with_unequal_parts():
     )
 
     v0_parts = [v0_audit_frame(df, 30.0) for df in dfs]
-    new_parts = [audit_frame(df, 30.0) for df in dfs]
+    new_parts = [audit_frame(df, 30.0, head_hash=True) for df in dfs]
     assert len({p["frames"] for p in v0_parts}) == len(v0_parts), (
         "part shapes must carry different frame counts"
     )
@@ -318,3 +320,61 @@ def test_v0_equivalence_is_preserved_with_the_gate_disabled():
             f"{defect!r}: v0 {old.flags!r} != gate-disabled {new.flags!r}"
         )
         assert np.isclose(old.lag_frames, new.lag_frames, equal_nan=True)
+
+
+# --------------------------------------------------------------------------- #
+# duplicate_episodes. Found 2026-09-12: action_head_hash hashes only the first
+# 50 action frames, so episodes that begin from a shared home pose hash
+# identically no matter how differently they end. Robot episodes routinely
+# start from a home pose, so this is a common false positive, not an exotic
+# one. Measured: four fully divergent episodes sharing a 60 frame home pose
+# gave dup_episode_frac 0.750 and raised the flag.
+# --------------------------------------------------------------------------- #
+def _episodes(blocks, fps=30.0):
+    """One dataframe from a list of per-episode action arrays."""
+    import pandas as pd
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for e, a in enumerate(blocks):
+        s = a + rng.normal(0, 1e-3, size=a.shape)
+        for i in range(len(a)):
+            rows.append(
+                {
+                    "timestamp": np.float32(i / fps),
+                    "frame_index": i,
+                    "episode_index": e,
+                    "action": a[i].astype(np.float32),
+                    "observation.state": s[i].astype(np.float32),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_a_shared_home_pose_is_not_a_duplicate_episode():
+    """Episodes that start alike and end differently are not duplicates."""
+    rng = np.random.default_rng(1)
+    home = np.zeros((60, 6))
+    blocks = [
+        np.vstack([home, np.cumsum(rng.normal(0, 0.05, size=(240, 6)), axis=0)]) for _ in range(4)
+    ]
+    rep = summarise(
+        "s/home", {"codebase_version": "t", "fps": 30}, [audit_frame(_episodes(blocks), 30.0)]
+    )
+    assert "duplicate_episodes" not in rep.flags, (
+        f"a shared home pose was reported as duplication: dup_episode_frac={rep.dup_episode_frac}"
+    )
+
+
+def test_genuinely_duplicated_episodes_are_still_flagged():
+    """The fix must not silence real duplication."""
+    rng = np.random.default_rng(2)
+    one = np.cumsum(rng.normal(0, 0.05, size=(300, 6)), axis=0)
+    rep = summarise(
+        "s/dup",
+        {"codebase_version": "t", "fps": 30},
+        [audit_frame(_episodes([one, one.copy(), one.copy()]), 30.0)],
+    )
+    assert "duplicate_episodes" in rep.flags, (
+        "three identical episodes must still raise duplicate_episodes"
+    )
