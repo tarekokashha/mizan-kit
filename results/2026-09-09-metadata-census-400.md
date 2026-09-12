@@ -2,8 +2,9 @@
 
 First live run of the M-02 LEDGER census. Tier 1 only: this reads each
 dataset's `meta/info.json` and records what it declares. It does not open any
-parquet, so nothing here is a temporal integrity finding. The deep tier has
-not been run.
+parquet, so nothing here is a temporal integrity finding. The deep tier ran
+later, on 2026-09-11, over a different sample; see the correction below and
+`2026-09-11-census-400-both-tiers.md`.
 
 
 ## Correction, 2026-09-11

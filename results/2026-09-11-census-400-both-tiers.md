@@ -25,6 +25,36 @@ earlier runs is present.
 Every proportion below carries a Wilson 95 percent interval from
 `cairo_protocol.stats.wilson_interval`.
 
+
+## Correction, 2026-09-12
+
+The flag counts below were computed before the lag correlation gate existed,
+so they include lag flags that the current code does not raise. All six
+`negative_lag` flags were an artifact of `xcorr_lag` returning the leftmost
+lag, -5, for any dataset whose columns are constant, and eleven `large_lag`
+flags had the same defect.
+
+Corrected counts over the same 353 audited datasets:
+
+| flag | as published below | corrected |
+|---|---|---|
+| `large_lag` | 198, rate 0.561 | 187, rate 0.530 |
+| `negative_lag` | 6, rate 0.0170 | 0, rate 0.0000 |
+| any flag | 238, rate 0.674 | 229, rate 0.6487 |
+| `stuck_state`, `duplicate_episodes`, `action_equals_state` | unchanged | unchanged |
+
+Two other statements below have also been overtaken by later work. The
+"What this does not establish" section says the `confirmed` column is empty
+for all 400 records: 16 were confirmed by the owner on 2026-09-12, and 12
+still carry a confirmable flag after this correction. The "Next" section
+asks for a human to open the `negative_lag` and `action_equals_state`
+cases: that was done, and it is what exposed the defect above.
+
+The numbers below are left as published because this is the dated record of
+what that run measured. Rewriting them would falsify it. The full account is
+in `2026-09-12-lag-gate-correction.md`, the confirmations in
+`2026-09-12-evidence-16-flagged.md`.
+
 ## The headline number depends on a flag I do not fully trust
 
 Read this before the table.

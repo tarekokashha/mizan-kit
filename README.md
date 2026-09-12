@@ -10,7 +10,7 @@ trial analysable, and a hardware harness with simulator based CI.
 [![tests](https://github.com/tarekokashha/mizan-kit/actions/workflows/tests.yml/badge.svg)](https://github.com/tarekokashha/mizan-kit/actions/workflows/tests.yml)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![tests count](https://img.shields.io/badge/tests-183%20%2B%2017%20doctests-brightgreen)](tests/)
+[![tests count](https://img.shields.io/badge/tests-186%20%2B%2017%20doctests-brightgreen)](tests/)
 
 </div>
 
@@ -33,13 +33,13 @@ this README will not collapse it into one number:
 
 | measure | n | rate | 95 percent interval |
 |---|---|---|---|
-| any flag raised, as measured | 238/353 | 0.674 | [0.624, 0.721] |
-| any flag, excluding `large_lag` only | 132/353 | 0.374 | [0.325, 0.426] |
+| any flag raised | 229/353 | 0.6487 | [0.5976, 0.6967] |
+| any flag, excluding `large_lag` only | 132/353 | 0.3739 | [0.3251, 0.4255] |
 
-106 of the 238 flagged datasets carry `large_lag` and nothing else, and
+97 of the 229 flagged datasets carry `large_lag` and nothing else, and
 `large_lag` is the one flag this kit's own calibration shows to be
 unreliable below 6 action dimensions, which is where most of the Hub lives.
-Quoting 0.674 alone would be the most misleading thing this document could
+Quoting 0.6487 alone would be the most misleading thing this document could
 do.
 
 One result survives that caveat completely, because both tiers found it
@@ -94,7 +94,7 @@ a dataset nobody audited is not evidence.**
 
 ```bash
 pip install -e ".[test]"
-python -m pytest                     # 183 tests, 1 live Hub test deselected
+python -m pytest                     # 186 tests, 1 live Hub test deselected
 python -m ledger.audit --demo        # inject known defects, watch the checks catch them
 ```
 
@@ -107,7 +107,7 @@ synthetic/identity   30   0.000        0.000             1.000           0.0    
 synthetic/drops      30   0.055        0.000             0.000           2.0        bad_dt
 synthetic/stuck      30   0.000        0.249             0.000           2.0        stuck_state
 synthetic/swapped    30   0.000        0.000             0.000          -2.0        negative_lag
-synthetic/duplicate  30   0.000        0.000             0.000           6.0        large_lag|duplicate_episodes
+synthetic/duplicate  30   0.000        0.000             0.000           6.0        duplicate_episodes
 ```
 
 That output is pinned as a golden file, so any future change to a threshold
@@ -306,7 +306,7 @@ results/          append only census logs and write ups
 paper/            DRAFT.md and LIMITATIONS.md
 docs/             calibration measurements, design spec, decision record
 tools/            summarise_census.py
-tests/            183 tests, plus a frozen v0 reference
+tests/            186 tests, plus a frozen v0 reference
 ```
 
 ## Design decisions worth knowing

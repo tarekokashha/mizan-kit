@@ -40,15 +40,17 @@ All notable changes to this project are recorded here. The format follows
   the owner confirmed all 16 datasets carrying `action_equals_state`,
   `negative_lag` or `duplicate_episodes`, the three flags that indicate an
   outright recording error and do not depend on the lag estimator.
-  Confirmed prevalence over the 353 audited datasets is 0.0453
-  [0.0281, 0.0724], about one dataset in twenty.
-- That rate is a lower bound. `large_lag` at 0.561 and `stuck_state` at
-  0.351 were deliberately held out of the confirmation pass and remain
-  unconfirmed measurements.
+  Confirmed prevalence over the 353 audited datasets was 0.0453
+  [0.0281, 0.0724] as first recorded, and is 0.0340 [0.0196, 0.0585] after
+  the lag gate correction in the section above, about one dataset in thirty.
+- That rate is a lower bound. `large_lag`, 0.530 after the gate, and
+  `stuck_state` at 0.351 were deliberately held out of the confirmation pass
+  and remain unconfirmed measurements.
 - The confirmation was a blanket owner sign-off rather than 16 independent
   inspections with per-dataset notes, and every document that carries the
-  rate says so. The evidence gathered to support it, which separates the 16
-  into three classes of very different strength, is in
+  rate says so. Four of the 16 were subsequently found to rest on a flag the
+  fixed code does not raise; see the Corrected section above. The evidence,
+  which separates the 16 into three classes of very different strength, is in
   `results/2026-09-12-evidence-16-flagged.md`.
 - `paper/DRAFT.md` gains a Discussion and a Conclusion. Related Work stays
   Pending, because `CLAUDE.md` forbids citing from memory and no citation

@@ -99,9 +99,9 @@ The only open question was ever interpretation, not measurement.
 
 Class B is weaker, and deliberately so. Five of its six datasets sit at
 exactly 6 action dimensions, the lowest dimensionality `docs/calibration.md`
-validated. The flags may well be right; the lag number alone does not
-establish it. The check that would settle them, whether swapping the two
-columns yields a positive and physically sensible lag, has not been run.
+validated. The lag number alone did not establish it, and the check that would settle
+them has since been run: it refuted all six. See
+`2026-09-12-column-swap-check.md` and `2026-09-12-lag-gate-correction.md`.
 
 Class C is a different kind of object altogether. `FedorX8/dobbe_lerobot`
 was flagged `duplicate_episodes`, which the episode hash evaluates
@@ -121,30 +121,27 @@ Suggested values `yes`, `no`, `unclear`. To look again at any single one:
 
     python tools/inspect_flagged.py <repo-id>
 
-## Confirmed prevalence
+## Confirmed prevalence, corrected
 
-With all 16 confirmed, over the 353 audited datasets:
+The table this section originally carried is superseded. All six
+`negative_lag` flags turned out to be an artifact of `xcorr_lag` returning
+the leftmost lag for a dataset with no signal, so four of the sixteen
+confirmations no longer carry any confirmable flag. Full account in
+`2026-09-12-lag-gate-correction.md`.
 
 | finding | n | rate | 95 percent Wilson |
 |---|---|---|---|
 | `duplicate_episodes` | 7/353 | 0.0198 | [0.0096, 0.0404] |
-| `negative_lag` | 6/353 | 0.0170 | [0.0078, 0.0366] |
 | `action_equals_state` | 5/353 | 0.0142 | [0.0061, 0.0327] |
-| **any confirmed finding** | **16/353** | **0.0453** | **[0.0281, 0.0724]** |
+| `negative_lag` | 0/353 | 0.0000 | [0.0000, 0.0108] |
+| **any confirmed finding** | **12/353** | **0.0340** | **[0.0196, 0.0585]** |
 
-About 4.5 percent of LeRobot datasets carry a confirmed recording defect,
-interval 2.8 to 7.2 percent.
+About one dataset in thirty carries a confirmed recording defect, interval
+2.0 to 5.9 percent.
 
-Two things bound that number, both upward and downward.
+It remains a **lower bound**: `large_lag` at 0.530 after the gate and
+`stuck_state` at 0.351 were held out of the confirmation pass.
 
-It is a **lower bound** on defects overall, because `large_lag` and
-`stuck_state` were deliberately excluded from this pass and remain
-unconfirmed measurements. `large_lag` alone was measured at 0.561 and is the
-flag the calibration distrusts below 6 action dimensions; `stuck_state` at
-0.351 has innocent explanations. Neither is counted here.
-
-It rests on a **blanket confirmation**, so its strength is the strength of
-the evidence in this document rather than of 16 independent inspections
-with notes. The Class A evidence is overwhelming on its own terms. The
-Class B evidence is weaker, for the dimensionality reason given above, and a
-reviewer is entitled to weigh those two differently.
+It also rests on a **blanket confirmation**, so its strength is the strength
+of the evidence in this document rather than of 16 independent inspections.
+Class A stands on its own. Class B did not survive the check.

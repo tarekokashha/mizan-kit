@@ -347,12 +347,12 @@ were rare: `duplicate_episodes` 0.020 [0.010, 0.040], `negative_lag` 0.017
 [0.008, 0.037], `action_equals_state` 0.014 [0.006, 0.033].
 
 The headline rate is not reportable as a single number. Any flag was
-raised for 0.674 [0.624, 0.721] of audited datasets, but 106 of those
+raised for 0.6487 [0.5976, 0.6967] of audited datasets, but 97 of those
 carry `large_lag` alone, and `large_lag` is the flag the calibration in
 `docs/calibration.md` shows to be least reliable below 6 action
-dimensions. Excluding datasets flagged only by `large_lag` gives 0.374
-[0.325, 0.426]. The true rate lies somewhere across that span, and this
-run does not settle where. Reporting 0.674 without that caveat would
+dimensions. Excluding datasets flagged only by `large_lag` gives 0.3739
+[0.3251, 0.4255]. The true rate lies somewhere across that span, and this
+run does not settle where. Reporting 0.6487 without that caveat would
 misrepresent the evidence.
 
 One result is validated across both tiers independently. Of the 34

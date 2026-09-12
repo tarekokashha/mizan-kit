@@ -16,12 +16,13 @@ The deep tier completed on 2026-09-11, 353 of 400 datasets audited. That
 removes the earlier incompleteness limitation and replaces it with a
 sharper one.
 
-Any flag was raised for 0.674 [0.624, 0.721] of audited datasets. But 106
-of the 238 flagged carry `large_lag` and nothing else, and `large_lag` is
+Any flag was raised for 0.6487 [0.5976, 0.6967] of audited datasets, after
+the lag correlation gate. But 97 of the 229 flagged carry `large_lag` and
+nothing else, and `large_lag` is
 the flag this kit's own calibration shows to be least trustworthy: below 6
 action dimensions the lag estimator does not reliably resolve the argmax,
 and the median Hub dataset is small. Excluding datasets flagged only by
-`large_lag` gives 0.374 [0.325, 0.426].
+`large_lag` gives 0.3739 [0.3251, 0.4255].
 
 So the honest statement is that somewhere between roughly a third and
 roughly two thirds of LeRobot datasets show a temporal irregularity, and
