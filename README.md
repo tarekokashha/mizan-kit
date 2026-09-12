@@ -153,7 +153,7 @@ Per episode, then pooled per dataset:
 | `ts_nonmonotonic` | timestamps go backwards |
 | `bad_dt` | frame intervals outside the declared fps |
 | `frame_gaps` | holes in `frame_index` |
-| `stuck_state` | consecutive observations bit identical, a stalled sensor |
+| `stuck_state` | consecutive observations bit identical. Not on its own a defect: see the limitation below |
 | `action_equals_state` | `action == observation.state` exactly, the "action is just the state" recording bug |
 | `large_lag` / `negative_lag` | the lag at which action best predicts state is large, or inverted |
 | `duplicate_episodes` | episodes whose opening frames hash identically |
@@ -350,6 +350,17 @@ Stated plainly, because a research kit that hides these is worse than none.
 - **400 of 75,750** is about 0.53 percent, run anonymously.
 - **About 1 percent of datasets declare a layout no reader can follow**, and
   are excluded from any parquet level claim.
+- **`stuck_state` at 0.351 is not a defect rate.** The flag fires on bit
+  identical consecutive observations, which happens both when an encoder
+  reports the same quantised value during a deliberate hold, which is
+  innocent, and when the state fails to follow a changing command, which is
+  a defect. Of 10 flagged datasets sampled, 8 were consistent with the
+  innocent cause. Neither the threshold nor the run length structure
+  separates them. The `stuck_while_commanded` check added on 2026-09-12 is
+  the comparison that does, and the census predates it, so the 0.351 figure
+  should be read as a rate of a condition rather than of a fault. Full
+  analysis in
+  [`results/2026-09-12-stuck-state-check.md`](results/2026-09-12-stuck-state-check.md).
 - **`lerobot_ur` is a skeleton** that has produced no robot number.
 
 Full detail in [`paper/LIMITATIONS.md`](paper/LIMITATIONS.md).

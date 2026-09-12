@@ -68,6 +68,22 @@ the synthetic generator in `ledger/synth.py` builds clean data:
   state carries independent Gaussian noise every frame (`noise=1e-3` by
   default), so two consecutive frames matching exactly has effectively
   zero probability.
+
+  **Correction, 2026-09-12.** That sentence is the reason the 0 of 450
+  result says nothing about this flag. The generator cannot produce bit
+  identical consecutive frames at all, so the sweep never exercised
+  `stuck_state_frac`'s discriminating power, and its 0.20 threshold is
+  uncalibrated in the way that matters. Worse, the real world has two
+  causes for the condition and this flag cannot tell them apart: an
+  encoder reporting the same quantised value while the arm deliberately
+  holds still, which is innocent and common in teleoperation data, and a
+  state that does not follow a changing command, which is a defect. Of 10
+  flagged datasets sampled from the census, 8 were consistent with the
+  innocent cause, and values from 0.20 to 0.99 appeared on both sides.
+  Neither the threshold nor the run length structure sorted them. Only
+  comparing the action channel did. The new `stuck_while_commanded` check
+  in `ledger/checks.py` is that comparison. See
+  `results/2026-09-12-stuck-state-check.md`.
 - `identity_frac` measures `action` equalling `state` within the check's
   `rtol=1e-5, atol=0.0` tolerance. Clean data separates the two by a
   `lag`-frame offset plus that same per-frame noise, which is orders of

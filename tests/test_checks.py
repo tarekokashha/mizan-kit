@@ -159,3 +159,69 @@ def test_episode_stats_has_no_stack_error_on_a_clean_episode():
     stats = episode_stats(ep, fps=30.0)
     assert stats.action is not None
     assert stats.stack_error is False
+
+
+# --------------------------------------------------------------------------- #
+# stuck_while_commanded. Found 2026-09-12: stuck_state fires on bit identical
+# consecutive observations, which has two very different causes. An encoder
+# reporting the same quantised value while the arm deliberately holds still is
+# innocent and expected in teleoperation data. A state that does not follow a
+# changing command is a defect. Of 10 flagged datasets sampled from the census,
+# 8 were consistent with the innocent cause. Neither stuck_state_frac nor the
+# run length structure separated them; only comparing the action channel did.
+# --------------------------------------------------------------------------- #
+def _stats_from(action, state, fps=30.0):
+    import pandas as pd
+
+    n = len(action)
+    df = pd.DataFrame(
+        {
+            "timestamp": np.arange(n, dtype=np.float32) / fps,
+            "frame_index": np.arange(n, dtype=np.int64),
+            "episode_index": np.zeros(n, dtype=np.int64),
+            "action": list(action),
+            "observation.state": list(state),
+        }
+    )
+    return episode_stats(df, fps)
+
+
+def test_a_deliberate_hold_is_not_stuck_while_commanded():
+    """Action frozen and state frozen together: the arm was told to hold."""
+    n = 200
+    a = np.zeros((n, 6))
+    s = np.zeros((n, 6))
+    v = run_checks(_stats_from(a, s))
+    assert v["stuck_state_frac"] > 0.9, "the state really is frozen here"
+    assert v["stuck_while_commanded"] == 0.0, (
+        "a frozen state under a frozen command is a hold, not a fault"
+    )
+
+
+def test_a_state_that_ignores_a_changing_command_is_flagged():
+    """Action moving, state frozen: the arm was commanded and did not follow."""
+    n = 200
+    a = np.cumsum(np.full((n, 6), 0.01), axis=0)  # commanded to move every frame
+    s = np.zeros((n, 6))  # state never changes
+    v = run_checks(_stats_from(a, s))
+    assert v["stuck_while_commanded"] > 0.9, (
+        f"a frozen state under a moving command must be flagged, got {v['stuck_while_commanded']}"
+    )
+
+
+def test_healthy_data_is_not_stuck_while_commanded():
+    from ledger.synth import make_episodes
+
+    df = make_episodes(n_eps=1, T=300, seed=0)
+    ep = df[df["episode_index"] == 0]
+    v = run_checks(episode_stats(ep, 30.0))
+    assert v["stuck_while_commanded"] == 0.0
+
+
+def test_stuck_while_commanded_is_nan_when_widths_differ():
+    """2 of the 10 sampled datasets had incomparable action and state widths,
+    a condition the flag itself cannot see. nan, not a number."""
+    a = np.zeros((100, 7))
+    s = np.zeros((100, 8))
+    v = run_checks(_stats_from(a, s))
+    assert np.isnan(v["stuck_while_commanded"])

@@ -6,6 +6,36 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `stuck_while_commanded` in `ledger/checks.py`: the fraction of frames where
+  `observation.state` is frozen while `action` is not. This is the
+  companion measurement `stuck_state` needed and the one that actually
+  discriminates. Returns nan when the two channels cannot be compared,
+  including when their widths differ, which 2 of 10 sampled datasets were.
+
+### Corrected
+
+- **`stuck_state` at 0.351 is not a defect rate.** The flag fires on bit
+  identical consecutive observations, which has two very different causes: an
+  encoder reporting the same quantised value while the arm deliberately holds
+  still, which is innocent and common in teleoperation data, and a state that
+  does not follow a changing command, which is a defect. Of 10 flagged
+  datasets sampled from the census, 8 were consistent with the innocent
+  cause. Values from 0.20 to 0.99 appeared on both sides, and the clearest
+  few-long-runs shape in the sample turned out innocent once the action
+  channel was read. Neither the threshold nor the run length structure sorted
+  them. Written up in `results/2026-09-12-stuck-state-check.md`.
+- `docs/calibration.md` reported 0 false positives for `stuck_state_frac`
+  across 450 configurations. That result is vacuous, and the document's own
+  prose said why without drawing the conclusion: the synthetic generator adds
+  independent Gaussian noise every frame, so it cannot produce bit identical
+  consecutive frames at all. The sweep never exercised this flag, and its
+  0.20 threshold is uncalibrated in the way that matters. Corrected in place.
+- The census predates `stuck_while_commanded`, so the 0.351 figure stands as
+  a rate of a condition rather than of a fault. Separating them needs a
+  re-run.
+
 ### Corrected
 
 - **All six `negative_lag` flags were an artifact, and the confirmed count

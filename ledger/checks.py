@@ -164,6 +164,42 @@ def stuck_state_frac(s: EpisodeStats) -> float:
     return float(same.sum() / len(same))
 
 
+@register("stuck_while_commanded")
+def stuck_while_commanded(s: EpisodeStats) -> float:
+    """Fraction of frames where the state is frozen but the action is not.
+
+    This is the companion measurement stuck_state_frac needs, and the one
+    that actually discriminates. A bit identical consecutive observation has
+    two very different causes:
+
+    - The arm was commanded to hold still and did. An encoder reporting the
+      same quantised value during a pause before a grasp is expected in real
+      teleoperation data, and is not a defect.
+    - The arm was commanded to move and the state did not follow. That is a
+      stalled sensor or a frozen recording pipeline, and it is a defect.
+
+    stuck_state_frac cannot tell these apart, and neither can the run length
+    structure of the stuck frames. Measured on 2026-09-12 across 10 datasets
+    sampled from the census, 8 were consistent with the innocent cause, and
+    values from 0.20 to 0.99 appeared on both sides. The clearest few-long-runs
+    shape in the sample turned out innocent once the action channel was read.
+    Only this comparison sorted them. See
+    results/2026-09-12-stuck-state-check.md.
+
+    Returns nan when the two channels cannot be compared, either because one
+    is absent or because their widths differ. Two of the ten sampled datasets
+    were in that position, which is a structural condition the flag itself
+    cannot see, so it is reported as nan rather than as a number.
+    """
+    if s.state is None or s.action is None:
+        return float("nan")
+    if s.state.shape != s.action.shape or len(s.state) < 2:
+        return float("nan")
+    state_frozen = np.all(s.state[1:] == s.state[:-1], axis=1)
+    action_moving = ~np.all(s.action[1:] == s.action[:-1], axis=1)
+    return float((state_frozen & action_moving).sum() / len(state_frozen))
+
+
 @register("identity_frac")
 def identity_frac(s: EpisodeStats) -> float:
     if s.state is None or s.action is None or s.state.shape != s.action.shape:
